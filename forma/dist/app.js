@@ -32,6 +32,11 @@ function toast(message) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
 }
+function scrollPageToTop(behavior) {
+  const options = { top: 0, behavior };
+  main.scrollTo(options);
+  window.scrollTo(options);
+}
 function draw() {
   if (!state) return;
   const p = route();
@@ -51,7 +56,7 @@ function draw() {
     void main.offsetWidth;
     main.classList.add('page-enter');
     lastRoute = p;
-    window.scrollTo({ top: 0, behavior: 'instant' });
+    scrollPageToTop('instant');
   }
   document.title =
     (p === 'run' ? 'Workout' : p[0].toUpperCase() + p.slice(1)) + ' · Form';
@@ -309,7 +314,7 @@ async function actions(action, b) {
       ctx.exercise = id;
       ctx.graphSet = null;
       draw();
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      scrollPageToTop('smooth');
       return;
     case 'food-new':
     case 'food-edit':
