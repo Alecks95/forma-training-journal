@@ -7,7 +7,8 @@ import json, mimetypes, os, re, time
 
 # All shipped app files, including the offline worker, come from these releases.
 revisions = {'first': 'dea359f', 'middle': '739a262', 'today': '9a705ae', 'classic': '9a705ae'}
-revisions.update(prelogo='9bcb5b4', animated='ea8e232', direct='c623dc4', recorded='45ccd34')
+revisions.update(second='d879ab9', firstopaque='ef84088', renamed='739a262', prelogo='9bcb5b4',
+                 animated='ea8e232', direct='c623dc4', recorded='45ccd34')
 names = {'first': 'Form First', 'middle': 'Form Middle', 'today': 'Form Today'}
 served = {k: k for k in names}
 sim = os.environ['SIM']
@@ -73,12 +74,8 @@ class Handler(BaseHTTPRequestHandler):
             html=body.decode()
             if revision=='classic':
                 html=historical_shell(html)
-            html=re.sub(r'<meta\s+name="apple-mobile-web-app-title"[^>]*>', '', html)
-            html=html.replace('</head>', '<meta name="apple-mobile-web-app-title" content="'+names[variant]+'"></head>')
             probe="""<script>addEventListener('load',()=>setTimeout(()=>{let t=document.createElement('i');t.style.cssText='position:fixed;visibility:hidden;height:env(safe-area-inset-top)';document.body.append(t);fetch('/seen/VARIANT',{method:'POST',body:JSON.stringify({rev:'REV',standalone:navigator.standalone,inset:getComputedStyle(t).height,h:innerHeight,clock:Date.now(),worker:!!navigator.serviceWorker.controller})});t.remove()},500))</script>"""
             body=html.replace('</body>',probe.replace('VARIANT',variant).replace('REV',revision)+'</body>').encode()
-        elif name=='manifest.webmanifest':
-            m=json.loads(body);m.update(name=names[variant],short_name=names[variant]);body=json.dumps(m).encode()
         elif name=='sw.js' and revision=='classic':
             body=body.replace(b"'v17'",b"'historical-shell-test'")
         self.send_response(200)

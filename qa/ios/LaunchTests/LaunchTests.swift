@@ -49,10 +49,12 @@ final class LaunchTests: XCTestCase {
         add.tap()
         let confirm = safari.buttons["Add"].firstMatch
         guard confirm.waitForExistence(timeout:6) else {snapshot("Confirming",safari);throw Failure.missing("Add")}
+        let installedName = (safari.textFields.firstMatch.value as? String) ?? name
+        print("FORM ORIGINAL ICON NAME " + installedName)
         confirm.tap()
         Thread.sleep(forTimeInterval:1)
         if spring.state != .runningForeground { XCUIDevice.shared.press(.home) }
-        let icon = spring.icons[name].firstMatch
+        let icon = spring.icons.matching(NSPredicate(format:"label IN %@", [installedName, name, "Forma", "Form", "Forma · Training Journal"])).firstMatch
         for _ in 0..<4 {
             if icon.exists && icon.isHittable {break}
             spring.swipeLeft()
@@ -63,7 +65,7 @@ final class LaunchTests: XCTestCase {
     func compare(_ channel:String, _ name:String) throws {
         continueAfterFailure = false
         let icon = try install(channel, name:name)
-        let modes = ["first","prelogo","animated","direct","recorded","today","classic","first"]
+        let modes = ["first","second","firstopaque","renamed","prelogo","animated","direct","recorded","today","classic","first"]
         for (i, mode) in modes.enumerated() {
             if i != 0 {try record("change",channel+"-"+mode)}
             for stage in ["receive","cold1","warm"] {
