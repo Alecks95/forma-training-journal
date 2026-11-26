@@ -53,8 +53,10 @@ function draw() {
   });
   if (p !== lastRoute) {
     main.classList.remove('page-enter');
-    void main.offsetWidth;
-    main.classList.add('page-enter');
+    if (lastRoute) {
+      void main.offsetWidth;
+      main.classList.add('page-enter');
+    }
     lastRoute = p;
     scrollPageToTop('instant');
   }
@@ -576,4 +578,18 @@ async function init() {
       .catch(() => toast('Offline setup paused. Reopen online to retry.'));
   }
 }
-init();
+const launch = document.querySelector('.launch-screen');
+// The same release path also reveals the recovery message if storage is unavailable.
+init().finally(() => {
+  if (
+    matchMedia('(prefers-reduced-motion: reduce)').matches ||
+    getComputedStyle(launch).visibility === 'hidden'
+  ) {
+    launch.remove();
+    return;
+  }
+  launch.addEventListener('animationend', (event) => {
+    if (event.target === launch) launch.remove();
+  });
+  launch.classList.add('revealing');
+});

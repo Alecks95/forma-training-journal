@@ -25,18 +25,47 @@
     <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
-    <div class="launch-screen" aria-hidden="true">
-      <img src="./assets/icon-180.png" alt="" width="88" height="88" />
-    </div>
-    <a class="skip" href="#main">Skip to content</a>
-    <header>
-      <div class="bar">
-        <a class="brand" href="#workouts" aria-label="Form workouts"
-          ><span class="app-symbol" aria-hidden="true">F</span>Form</a
+    <svg
+      class="launch-screen"
+      aria-hidden="true"
+      focusable="false"
+      width="0"
+      height="0"
+    >
+      <defs>
+        <mask
+          id="launch-cutout"
+          maskUnits="userSpaceOnUse"
+          x="0"
+          y="0"
+          width="100%"
+          height="100%"
         >
-        <nav id="nav" aria-label="Main navigation"></nav>
-      </div>
-    </header>
+          <rect width="100%" height="100%" fill="white" />
+          <svg x="50%" y="50%" width="1" height="1" overflow="visible">
+            <path
+              class="launch-mark"
+              fill="black"
+              d="M-17-47H43L39-31H-4L-10-8H26L22 8H-14L-24 47H-42Z"
+            />
+          </svg>
+        </mask>
+      </defs>
+      <rect class="launch-ink" width="100%" height="100%" fill="#f4f4f3" />
+      <rect
+        width="100%"
+        height="100%"
+        fill="black"
+        mask="url(#launch-cutout)"
+      />
+    </svg>
+    <a class="skip" href="#main">Skip to content</a>
+    <div class="app-navigation">
+      <a class="brand" href="#workouts" aria-label="Form workouts"
+        ><span class="app-symbol" aria-hidden="true">F</span>Form</a
+      >
+      <nav id="nav" aria-label="Main navigation"></nav>
+    </div>
     <main id="main" tabindex="-1">
       <p class="loading">Opening your journal…</p>
     </main>
