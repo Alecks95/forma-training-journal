@@ -28,9 +28,11 @@ def historical_shell(html):
       :root {--status-bar-height:env(safe-area-inset-top,0px);color-scheme:dark;background:#000}
       body {margin:0;background:#000}
       #system-area {display:none}
-      @media (max-width:720px),(display-mode:standalone) and (pointer:coarse) {
-        body {padding-top:0!important}
-        #system-area {display:block;flex:none;height:var(--status-bar-height);background:#000}
+      @media (max-width:720px),(any-pointer:coarse) {
+        html body {padding-top:0;grid-template-rows:var(--status-bar-height) minmax(0,1fr) auto}
+        #system-area {display:block;grid-area:1 / 1;background:#000}
+        body > main {grid-area:2 / 1}
+        body > .app-navigation {grid-area:3 / 1}
       }
     </style>
 ''' + html[end:]
