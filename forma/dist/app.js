@@ -578,18 +578,4 @@ async function init() {
       .catch(() => toast('Offline setup paused. Reopen online to retry.'));
   }
 }
-const launch = document.querySelector('.launch-screen');
-// The same release path also reveals the recovery message if storage is unavailable.
-init().finally(() => {
-  if (
-    matchMedia('(prefers-reduced-motion: reduce)').matches ||
-    getComputedStyle(launch).visibility === 'hidden'
-  ) {
-    launch.remove();
-    return;
-  }
-  launch.addEventListener('animationend', (event) => {
-    if (event.target === launch) launch.remove();
-  });
-  launch.classList.add('revealing');
-});
+init();

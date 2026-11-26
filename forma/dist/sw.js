@@ -1,6 +1,6 @@
 const scope = new URL(self.registration.scope);
 const prefix = 'forma-assets-' + scope.pathname + '-';
-const cacheName = prefix + 'v10';
+const cacheName = prefix + 'v11';
 const assets = [
   './',
   './index.html',
