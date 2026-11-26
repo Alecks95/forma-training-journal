@@ -4,11 +4,9 @@
 
 On iPhone, open the link in Safari, tap **Share**, choose **Add to Home Screen**, then open Form from its icon. Open it online once to prepare offline access. Friends can use the same link. Each installation has its own journal.
 
-If an older Home Screen icon flashes grey behind the clock and battery, keep that icon and add a second copy from [the current install page](https://alecks95.github.io/forma-training-journal/index?install=fullscreen) in Safari. Give it a different name so you can test its launch. To move your journal, use **Settings → Export backup** in the original and **Settings → Restore backup** in the new copy.
-
 ## Training
 
-Create a routine with your exercises, sets, reps, reps in reserve (RIR) and rest times. Start it to get a prefilled set table, or start an empty workout. Enter the weight for each set during the session, using 0 for bodyweight. Checking off a set starts that exercise’s timer. Finished workouts appear in the exercise progression charts and in the History calendar. Tap a yellow day to see its workouts.
+New journals start with empty routine and exercise libraries. Create a routine with your exercises, sets, reps, reps in reserve (RIR) and rest times. Start it to get a prefilled set table, or start an empty workout. Enter the weight for each set during the session, using 0 for bodyweight. Checking off a set starts that exercise’s timer. Finished workouts appear in the exercise progression charts and in the History calendar. Tap a yellow day to see its workouts.
 
 ## Nutrition and weight
 

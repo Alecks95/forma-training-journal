@@ -1019,7 +1019,8 @@ dialog::backdrop {
   gap: var(--sheet-gap);
   align-items: end;
 }
-.sheet [data-items]:empty {
+.sheet [data-items]:empty,
+.exercise-picker:has([data-pick]:empty) {
   display: none;
 }
 .sheet .chart-note {

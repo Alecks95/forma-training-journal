@@ -22,38 +22,84 @@ export const kgWeight = (value, unit) =>
 export const macros = ['kcal', 'protein', 'carbs', 'fat'];
 
 export function initialState() {
-  const exercises = [
-    ['goblet-squat', 'Goblet squat', 10, 90],
-    ['dumbbell-press', 'Dumbbell bench press', 8, 90],
-    ['cable-row', 'Seated cable row', 10, 60],
-  ].map(([id, name, reps, rest]) => ({
-    id,
-    name,
-    sets: 3,
-    reps,
-    rir: 2,
-    rest,
-  }));
   return {
     version: 1,
+    starterLibraryRemoved: true,
     unit: 'kg',
     goals: { kcal: 2000, protein: 120, carbs: 250, fat: 60 },
-    exercises,
-    routines: [
-      {
-        id: 'full-body',
-        name: 'Full Body A',
-        items: exercises.map(({ id, name, ...targets }) => ({
-          exerciseId: id,
-          ...targets,
-        })),
-      },
-    ],
+    exercises: [],
+    routines: [],
     sessions: [],
     active: null,
     foods: [],
     meals: [],
     weights: [],
+  };
+}
+
+// These fixed IDs appeared only in older installations. User-created IDs are UUIDs.
+const oldExercises = [
+  { id: 'goblet-squat', name: 'Goblet squat', reps: 10, rest: 90 },
+  { id: 'dumbbell-press', name: 'Dumbbell bench press', reps: 8, rest: 90 },
+  { id: 'cable-row', name: 'Seated cable row', reps: 10, rest: 60 },
+];
+
+function originalTargets(row, original) {
+  return (
+    row.sets === 3 &&
+    row.rir === 2 &&
+    row.reps === original.reps &&
+    row.rest === original.rest &&
+    (row.kg === undefined || row.kg === 0)
+  );
+}
+
+function removeStarterLibrary(journal) {
+  if (journal.starterLibraryRemoved === true) return false;
+  // Deleting a library exercise also removed its row from the original routine.
+  const remaining = oldExercises.filter((o) =>
+    journal.exercises.some((e) => e.id === o.id),
+  );
+  journal.routines = journal.routines.filter((r) => {
+    const original =
+      r.id === 'full-body' &&
+      r.name === 'Full Body A' &&
+      r.items.length === remaining.length &&
+      r.items.every(
+        (item, i) =>
+          item.exerciseId === remaining[i].id &&
+          originalTargets(item, remaining[i]),
+      );
+    return !original;
+  });
+  const inRoutine = new Set(
+    journal.routines.flatMap((r) => r.items.map((i) => i.exerciseId)),
+  );
+  journal.exercises = journal.exercises.filter((e) => {
+    const original = oldExercises.find((o) => o.id === e.id);
+    return (
+      !original ||
+      inRoutine.has(e.id) ||
+      e.name !== original.name ||
+      !originalTargets(e, original)
+    );
+  });
+  // Sessions store their own exercise names and sets, including progression history.
+  journal.starterLibraryRemoved = true;
+  return true;
+}
+
+export function sessionExerciseItem(exercise, targets = exercise) {
+  return {
+    exerciseId: exercise.id,
+    name: exercise.name,
+    rest: targets.rest,
+    sets: Array.from({ length: targets.sets }, () => ({
+      reps: targets.reps,
+      kg: null,
+      rir: targets.rir,
+      done: false,
+    })),
   };
 }
 
@@ -65,17 +111,12 @@ export function startSession(routine, state) {
     day: localDay(),
     started: Date.now(),
     restUntil: 0,
-    items: routine.items.map((item) => ({
-      exerciseId: item.exerciseId,
-      name: state.exercises.find((e) => e.id === item.exerciseId).name,
-      rest: item.rest,
-      sets: Array.from({ length: item.sets }, () => ({
-        reps: item.reps,
-        kg: null,
-        rir: item.rir,
-        done: false,
-      })),
-    })),
+    items: routine.items.map((item) =>
+      sessionExerciseItem(
+        state.exercises.find((e) => e.id === item.exerciseId),
+        item,
+      ),
+    ),
   };
 }
 export const doneSets = (session) =>
@@ -267,10 +308,12 @@ export function updateJournal(change) {
         result = req.result || initialState();
         const replacement = change?.(result);
         if (replacement) result = replacement;
+        const migrated = removeStarterLibrary(result);
         // Older sessions identify rows by position. Give each occurrence a stable
         // identity before displaying it, including duplicate exercises in a workout.
         const keyed = result.active && keyWorkoutRows(result.active);
-        if (change || !req.result || keyed) store.put(result, 'state');
+        if (change || !req.result || migrated || keyed)
+          store.put(result, 'state');
       } catch (e) {
         problem = e;
         tx.abort();

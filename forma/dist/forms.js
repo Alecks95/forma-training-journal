@@ -1,6 +1,6 @@
 import {
   uid,
-  startSession,
+  sessionExerciseItem,
   localDay,
   displayWeight,
   kgWeight,
@@ -195,7 +195,7 @@ export function buildForms(env) {
       );
     };
   }
-  function exercise(id, onSaved) {
+  function exercise(id, onSaved, sessionId) {
     const existing = state().exercises.find((e) => e.id === id),
       x = existing || { name: '', sets: 3, reps: 8, rir: 2, rest: 90 };
     const editor = form(
@@ -210,6 +210,7 @@ export function buildForms(env) {
         };
         await save((s) => {
           saveLibraryItem(s.exercises, record, existing);
+          if (sessionId) appendSessionExercise(s, sessionId, record);
         });
         onSaved?.(record);
         toast('Exercise saved');
@@ -741,8 +742,14 @@ export function buildForms(env) {
       }
     };
   }
+  function appendSessionExercise(s, sessionId, exercise) {
+    if (s.active?.id !== sessionId) throw Error('This session has changed.');
+    if (!exercise) throw Error('Choose an exercise.');
+    s.active.items.push(sessionExerciseItem(exercise));
+  }
   function sessionExercise() {
     const sessionId = state().active.id;
+    if (!state().exercises.length) return exercise(null, null, sessionId);
     const dlg = form(
       'Add exercise',
       selectField(
@@ -759,20 +766,8 @@ export function buildForms(env) {
       'Add to workout',
       async (fd) => {
         await save((s) => {
-          if (s.active?.id !== sessionId)
-            throw Error('This session has changed.');
           const e = s.exercises.find((x) => x.id === fd.get('exerciseId'));
-          if (!e) throw Error('Choose an exercise.');
-          s.active.items.push(
-            ...startSession(
-              {
-                id: 'empty',
-                name: 'Workout',
-                items: [{ ...e, exerciseId: e.id }],
-              },
-              s,
-            ).items,
-          );
+          appendSessionExercise(s, sessionId, e);
         });
       },
     );
