@@ -152,12 +152,19 @@ function workoutScreen(s, c) {
       ' working sets</p><ul class="routine-lines">' +
       items +
       '</ul>' +
-      btn(
-        s.active ? 'resume' : 'start',
-        icon('play', 15) + (s.active ? 'Resume workout' : 'Start routine'),
-        'start-routine full',
-        idAttr(r.id),
-      ) +
+      (!s.active && !r.items.length
+        ? btn(
+            'routine-edit',
+            icon('plus', 16) + 'Add exercises',
+            'start-routine full',
+            idAttr(r.id),
+          )
+        : btn(
+            s.active ? 'resume' : 'start',
+            icon('play', 15) + (s.active ? 'Resume workout' : 'Start routine'),
+            'start-routine full',
+            idAttr(r.id),
+          )) +
       '</section>'
     : '';
   return (
@@ -389,10 +396,51 @@ function weight(s) {
   );
 }
 function exercises(s, c) {
-  const current =
-      s.exercises.find((e) => e.id === c.exercise) || s.exercises[0],
+  const library = new Map(s.exercises.map((e) => [e.id, e]));
+  // Deleted library entries can still have recorded sets in History.
+  for (const w of sortedSessions(s)) {
+    for (const item of w.items) {
+      if (!library.has(item.exerciseId) && item.sets.some((set) => set.done)) {
+        library.set(item.exerciseId, {
+          id: item.exerciseId,
+          name: item.name + ' (history)',
+        });
+      }
+    }
+  }
+  const current = library.get(c.exercise) || library.values().next().value,
     points = current ? progression(s.sessions, current.id) : [];
-  const options = s.exercises
+  const selected = Math.min(c.graphSet ?? points.length - 1, points.length - 1);
+  const point = points[selected];
+  const inspector = point
+    ? '<label class="field space-top"><span>Inspect set</span><select id="graph-set">' +
+      points
+        .map(
+          (p, i) =>
+            '<option value="' +
+            i +
+            '" ' +
+            (selected === i ? 'selected' : '') +
+            '>' +
+            (i + 1) +
+            ' of ' +
+            points.length +
+            ' · ' +
+            dateText(p.day, {
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric',
+            }) +
+            ' · ' +
+            esc(p.workout) +
+            ' · Set ' +
+            p.setNumber +
+            '</option>',
+        )
+        .join('') +
+      '</select></label>'
+    : '';
+  const options = [...library.values()]
     .map(
       (e) =>
         '<option value="' +
@@ -409,10 +457,12 @@ function exercises(s, c) {
     (current
       ? '<label class="field"><span>Exercise progression</span><select id="exercise-select" class="select">' +
         options +
-        '</select></label><div class="grid2 space-top">' +
+        '</select></label>' +
+        inspector +
+        '<div class="grid2 space-top">' +
         [
-          ['kg', 'Heaviest set', s.unit],
-          ['reps', 'Most reps in a set', 'reps'],
+          ['kg', 'Weight per set', s.unit],
+          ['reps', 'Reps per set', 'reps'],
         ]
           .map(
             ([k, title, unit]) =>
@@ -420,7 +470,15 @@ function exercises(s, c) {
               boxIcon(k === 'kg' ? 'workouts' : 'activity', 'green') +
               title +
               '</h3>' +
-              pill(unit) +
+              pill(
+                point
+                  ? fmt(
+                      k === 'kg' ? displayWeight(point.kg, s.unit) : point.reps,
+                    ) +
+                      ' ' +
+                      unit
+                  : unit,
+              ) +
               '</div>' +
               plot(
                 points.map((p) => ({
@@ -428,8 +486,9 @@ function exercises(s, c) {
                   value: k === 'kg' ? displayWeight(p.kg, s.unit) : p.reps,
                 })),
                 unit,
+                { selectedSet: selected },
               ) +
-              '<p class="chart-note">Best completed set per training day.</p></section>',
+              '</section>',
           )
           .join('') +
         '</div>'
@@ -480,7 +539,9 @@ function previousSets(s, id) {
   }
   return [];
 }
-function activeExercise(s, item, ix) {
+function activeExercise(s, item) {
+  const entry =
+    'data-entry="' + item.entryId + '" data-workout="' + s.active.id + '"';
   const previous = previousSets(s, item.exerciseId);
   const tableHead =
     '<div class="set-line set-labels"><span>Set</span><span>Previous</span><span>' +
@@ -491,7 +552,7 @@ function activeExercise(s, item, ix) {
   const rows = item.sets
     .map((t, j) => {
       const prev = previous[j],
-        data = 'data-i="' + ix + '" data-j="' + j + '"',
+        data = entry + ' data-set-id="' + t.entryId + '"',
         prevText = prev?.done
           ? fmt(displayWeight(prev.kg, s.unit)) + ' × ' + prev.reps
           : '—';
@@ -556,29 +617,25 @@ function activeExercise(s, item, ix) {
   return (
     '<section class="run-card"><div class="card-top"><h3>' +
     esc(item.name) +
-    '</h3>' +
+    '</h3><div class="button-row">' +
     btn(
       'rest-edit',
       icon('timer', 15) + clockText(item.rest),
       'rest-control',
-      'data-i="' + ix + '" aria-label="Edit rest for ' + esc(item.name) + '"',
+      entry + ' aria-label="Edit rest for ' + esc(item.name) + '"',
     ) +
-    '</div>' +
+    smallBtn('manage-exercise', 'Manage ' + item.name, 'menu', entry) +
+    '</div></div>' +
     tableHead +
     rows +
     '<div class="set-actions">' +
-    btn(
-      'set-add',
-      icon('plus', 14) + 'Add set',
-      'text-btn',
-      'data-i="' + ix + '"',
-    ) +
+    btn('set-add', icon('plus', 14) + 'Add set', 'text-btn', entry) +
     (item.sets.length > 1 && !item.sets.at(-1).done
       ? btn(
           'set-remove',
           'Remove last set',
           'muted-action',
-          'data-i="' + ix + '"',
+          entry + ' data-set-id="' + item.sets.at(-1).entryId + '"',
         )
       : '') +
     '</div></section>'
@@ -619,7 +676,7 @@ export function runner(s) {
     '</div></div>' +
     (a.items.length
       ? '<div class="session-exercises">' +
-        a.items.map((i, ix) => activeExercise(s, i, ix)).join('') +
+        a.items.map((i) => activeExercise(s, i)).join('') +
         '</div>'
       : '<p class="subhead">Add your first exercise to start logging sets.</p>') +
     '<div class="run-footer">' +

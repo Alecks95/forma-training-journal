@@ -14,7 +14,7 @@ let state,
   toastTimer,
   lastRoute = '',
   restWasRunning = false;
-const ctx = { foodDay: localDay(), exercise: '', routine: '' };
+const ctx = { foodDay: localDay(), exercise: '', routine: '', graphSet: null };
 const main = document.querySelector('main'),
   nav = document.querySelector('nav');
 const bus =
@@ -169,12 +169,25 @@ function requireActive(s, id) {
     throw Error('This session has changed. Reopen the workout.');
   return s.active;
 }
+function activeItem(s, workoutId, entryId) {
+  const item = requireActive(s, workoutId).items.find(
+    (i) => i.entryId === entryId,
+  );
+  if (!item) throw Error('This exercise was removed from the workout.');
+  return item;
+}
+function findSet(item, id) {
+  const set = item.sets.find((set) => set.entryId === id);
+  if (!set) throw Error('This set was removed.');
+  return set;
+}
 async function begin(id) {
   closeAll();
   await save((s) => {
     if (s.active) return;
     const r = s.routines.find((x) => x.id === id);
     if (!r) throw Error('Choose an existing routine.');
+    if (!r.items.length) throw Error('Add an exercise to this routine first.');
     s.active = startSession(r, s);
   });
   go('run');
@@ -182,9 +195,7 @@ async function begin(id) {
 }
 async function completeSet(b) {
   const row = b.closest('.set-line'),
-    i = Number(b.dataset.i),
-    j = Number(b.dataset.j),
-    aId = state.active.id,
+    { workout, entry, setId } = b.dataset,
     u = state.unit,
     done = b.getAttribute('aria-pressed') !== 'true';
   const inputs = [...row.querySelectorAll('input')];
@@ -194,10 +205,11 @@ async function completeSet(b) {
   );
   values.kg = kgWeight(values.kg, u);
   await save((s) => {
-    const a = requireActive(s, aId),
-      item = a.items[i];
-    Object.assign(item.sets[j], values, { done });
+    const item = activeItem(s, workout, entry);
+    const a = s.active;
+    Object.assign(findSet(item, setId), values, { done });
     a.restUntil = done && item.rest ? Date.now() + item.rest * 1000 : 0;
+    a.restSetId = a.restUntil ? setId : null;
   });
 }
 function finish() {
@@ -208,6 +220,7 @@ function finish() {
   const end = async () => {
     await save((s) => {
       const w = requireActive(s, a.id);
+      if (!doneSets(w).length) throw Error('Complete a set before finishing.');
       s.sessions.push({
         ...w,
         ended: Math.max(w.started, Date.now()),
@@ -247,18 +260,18 @@ function discard() {
     },
   );
 }
-function editRest(ix) {
-  const a = state.active;
+function editRest(workout, entry) {
+  const item = activeItem(state, workout, entry);
   form(
     'Rest timer',
-    field('Rest after each set (seconds)', 'rest', a.items[ix].rest, {
+    field('Rest after each set (seconds)', 'rest', item.rest, {
       max: 3600,
       step: 1,
     }) + '<p>Applies to this exercise in the current session.</p>',
     'Save rest time',
     async (fd) => {
       await save((s) => {
-        requireActive(s, a.id).items[ix].rest = Number(fd.get('rest'));
+        activeItem(s, workout, entry).rest = Number(fd.get('rest'));
       });
       toast('Rest time saved');
     },
@@ -283,7 +296,10 @@ async function actions(action, b) {
       forms.routine(id);
       return;
     case 'session-detail':
-      forms.sessionDetails(id);
+      await forms.sessionDetails(id);
+      return;
+    case 'manage-exercise':
+      forms.manageExercise(b.dataset.workout, b.dataset.entry);
       return;
     case 'exercise-new':
     case 'exercise-edit':
@@ -291,6 +307,7 @@ async function actions(action, b) {
       return;
     case 'exercise-view':
       ctx.exercise = id;
+      ctx.graphSet = null;
       draw();
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
@@ -360,14 +377,19 @@ async function actions(action, b) {
       return;
     case 'set-add':
     case 'set-remove': {
-      const sessionId = state.active.id,
-        index = Number(b.dataset.i);
+      const { workout, entry, setId } = b.dataset;
       await save((s) => {
-        const sets = requireActive(s, sessionId).items[index].sets;
+        const sets = activeItem(s, workout, entry).sets;
         if (action === 'set-add') {
           if (sets.length >= 100) throw Error('Maximum 100 sets per exercise.');
-          sets.push({ ...sets.at(-1), done: false });
-        } else if (sets.length > 1 && !sets.at(-1).done) sets.pop();
+          const { kg, reps, rir } = sets.at(-1);
+          sets.push({ kg, reps, rir, done: false });
+        } else if (
+          sets.length > 1 &&
+          sets.at(-1).entryId === setId &&
+          !sets.at(-1).done
+        )
+          sets.pop();
       });
       return;
     }
@@ -384,7 +406,7 @@ async function actions(action, b) {
     case 'set-check':
       return completeSet(b);
     case 'rest-edit':
-      editRest(Number(b.dataset.i));
+      editRest(b.dataset.workout, b.dataset.entry);
       return;
     case 'rest-add':
     case 'rest-skip': {
@@ -414,6 +436,12 @@ async function actions(action, b) {
   }
 }
 document.addEventListener('click', async (e) => {
+  const chartSet = e.target.closest('[data-chart-set]');
+  if (chartSet) {
+    ctx.graphSet = Number(chartSet.dataset.chartSet);
+    draw();
+    return;
+  }
   const b = e.target.closest('[data-do]');
   if (!b || b.disabled || b.dataset.do === 'inline') return;
   try {
@@ -424,6 +452,12 @@ document.addEventListener('click', async (e) => {
 });
 document.addEventListener('change', async (e) => {
   const el = e.target;
+  if (el.id === 'graph-set') {
+    ctx.graphSet = Number(el.value);
+    draw();
+    document.getElementById('graph-set')?.focus({ preventScroll: true });
+    return;
+  }
   if (el.id === 'food-day') {
     if (el.value && el.validity.valid) {
       ctx.foodDay = el.value;
@@ -433,19 +467,18 @@ document.addEventListener('change', async (e) => {
   }
   if (el.id === 'exercise-select') {
     ctx.exercise = el.value;
+    ctx.graphSet = null;
     draw();
     return;
   }
   if (el.dataset.set && state.active) {
     if (!el.reportValidity()) return;
     const key = el.dataset.set,
-      id = state.active.id,
+      { workout, entry, setId } = el.dataset,
       v = key === 'kg' ? kgWeight(el.value, state.unit) : Number(el.value);
     try {
       await save((s) => {
-        requireActive(s, id).items[Number(el.dataset.i)].sets[
-          Number(el.dataset.j)
-        ][key] = v;
+        findSet(activeItem(s, workout, entry), setId)[key] = v;
       }, false);
     } catch (e) {
       toast(e.message);
@@ -464,19 +497,25 @@ document.addEventListener('visibilitychange', async () => {
     draw();
   }
 });
-document.querySelector('.settings').innerHTML = icon('settings', 19);
-nav.innerHTML = tabs
-  .map(
-    (k) =>
-      '<a href="#' +
-      k +
-      '" class="nav-link">' +
-      icon(k, 17) +
-      '<span>' +
-      (k === 'workouts' ? 'Workout' : k[0].toUpperCase() + k.slice(1)) +
-      '</span></a>',
-  )
-  .join('');
+nav.innerHTML =
+  tabs
+    .map(
+      (k) =>
+        '<a href="#' +
+        k +
+        '" class="nav-link">' +
+        icon(k, 17) +
+        '<span>' +
+        (k === 'workouts' ? 'Workout' : k[0].toUpperCase() + k.slice(1)) +
+        '</span></a>',
+    )
+    .join('') +
+  btn(
+    'settings',
+    icon('settings', 19) + '<span>Settings</span>',
+    'nav-link settings',
+    'aria-label="Settings and backups"',
+  );
 async function init() {
   try {
     await openDatabase();

@@ -7,6 +7,7 @@ import {
   macros,
   validState,
   doneSets,
+  keyWorkoutRows,
 } from './model.js';
 import {
   btn,
@@ -119,18 +120,73 @@ function readTargets(fd, unit, p = '') {
     rest: num(fd, p + 'rest'),
   };
 }
-function upsert(arr, record) {
-  const i = arr.findIndex((x) => x.id === record.id);
-  if (i === -1) arr.push(record);
-  else arr[i] = record;
+function saveLibraryItem(records, record, editing) {
+  const index = records.findIndex((item) => item.id === record.id);
+  if (editing && index < 0) throw Error('This item has already been removed.');
+  assertName(records, record.name, record.id);
+  if (index < 0) records.push(record);
+  else records[index] = record;
 }
 export function buildForms(env) {
   const { state, ctx, save, sheet, form, confirm, toast, go, draw } = env;
+  function addRemoveAction(editor, kind, record) {
+    if (!record) return;
+    const collection = {
+      exercise: 'exercises',
+      food: 'foods',
+      routine: 'routines',
+    }[kind];
+    const footer = editor.querySelector('.form-footer');
+    footer.insertAdjacentHTML(
+      'beforebegin',
+      btn('inline', 'Remove ' + kind, 'text-btn danger', 'data-remove-saved'),
+    );
+    editor.querySelector('[data-remove-saved]').onclick = () => {
+      let effect = 'Remove this ' + kind + ' from your library?';
+      if (kind === 'exercise') {
+        const count = state().routines.filter((r) =>
+          r.items.some((i) => i.exerciseId === record.id),
+        ).length;
+        effect = count
+          ? 'Remove this exercise from your library and ' +
+            count +
+            ' saved routine' +
+            (count === 1 ? '?' : 's?')
+          : effect;
+        effect +=
+          ' Your active and completed workouts keep their recorded sets.';
+      } else if (kind === 'food') {
+        effect += ' Your food diary keeps its logged portions and nutrients.';
+      } else {
+        effect += ' Your workout history stays available.';
+      }
+      confirm(
+        'Remove “' + record.name + '”?',
+        effect,
+        'Remove ' + kind,
+        async () => {
+          await save((s) => {
+            s[collection] = s[collection].filter(
+              (item) => item.id !== record.id,
+            );
+            if (kind === 'exercise') {
+              for (const routine of s.routines)
+                routine.items = routine.items.filter(
+                  (item) => item.exerciseId !== record.id,
+                );
+            }
+          });
+          editor.close();
+          toast('Removed from library');
+        },
+      );
+    };
+  }
   function exercise(id, onSaved) {
     const unit = state().unit,
       existing = state().exercises.find((e) => e.id === id),
       x = existing || { name: '', sets: 3, reps: 8, kg: 0, rir: 2, rest: 90 };
-    form(
+    const editor = form(
       existing ? 'Edit exercise' : 'New exercise',
       field('Exercise name', 'name', x.name, { type: 'text' }) +
         targets(x, unit) +
@@ -143,13 +199,13 @@ export function buildForms(env) {
           ...readTargets(fd, unit),
         };
         await save((s) => {
-          assertName(s.exercises, record.name, record.id);
-          upsert(s.exercises, record);
+          saveLibraryItem(s.exercises, record, existing);
         });
         onSaved?.(record);
         toast('Exercise saved');
       },
     );
+    addRemoveAction(editor, 'exercise', existing);
   }
   function routine(id) {
     const unit = state().unit,
@@ -172,7 +228,7 @@ export function buildForms(env) {
           exerciseId: el.dataset.exercise,
           ...readTargets(fd, unit, el.dataset.row + '-'),
         }));
-        if (!items.length)
+        if (!old && !items.length)
           throw Error('Add at least one exercise to the routine.');
         const record = {
           id: old?.id || uid(),
@@ -180,14 +236,20 @@ export function buildForms(env) {
           items,
         };
         await save((s) => {
-          assertName(s.routines, record.name, record.id);
-          upsert(s.routines, record);
+          if (
+            items.some((i) => !s.exercises.some((e) => e.id === i.exerciseId))
+          )
+            throw Error(
+              'A selected exercise was removed. Remove it from this draft before saving.',
+            );
+          saveLibraryItem(s.routines, record, old);
         });
         ctx.routine = record.id;
         draw();
         toast('Routine saved');
       },
     );
+    addRemoveAction(dlg, 'routine', old);
     let sequence = 0;
     const list = dlg.querySelector('[data-items]'),
       picker = dlg.querySelector('[data-pick]');
@@ -226,7 +288,7 @@ export function buildForms(env) {
         carbs: 0,
         fat: 0,
       };
-    form(
+    const editor = form(
       old ? 'Edit food' : 'New food',
       field('Food name', 'name', f.name, { type: 'text' }) +
         field('Portion (e.g. 100 g or 1 slice)', 'portion', f.portion, {
@@ -242,13 +304,13 @@ export function buildForms(env) {
           ...Object.fromEntries(macros.map((k) => [k, num(fd, k)])),
         };
         await save((s) => {
-          assertName(s.foods, record.name, record.id);
-          upsert(s.foods, record);
+          saveLibraryItem(s.foods, record, old);
         });
         onSaved?.(record);
         toast('Food saved');
       },
     );
+    addRemoveAction(editor, 'food', old);
   }
   function meal(id, date = ctx.foodDay) {
     if (!state().foods.length) {
@@ -360,11 +422,19 @@ export function buildForms(env) {
     dlg.querySelector('[name=day]').onchange = hint;
     hint();
   }
-  function sessionDetails(id) {
-    const s = state(),
-      w = s.sessions.find((x) => x.id === id);
+  async function sessionDetails(id) {
+    let w = state().sessions.find((x) => x.id === id);
     if (!w) return;
-    sheet(
+    if (w.items.some((i) => !i.entryId || i.sets.some((set) => !set.entryId))) {
+      await save((s) => {
+        const workout = s.sessions.find((x) => x.id === id);
+        if (workout) keyWorkoutRows(workout);
+      }, false);
+      w = state().sessions.find((x) => x.id === id);
+      if (!w) return;
+    }
+    const s = state();
+    const detail = sheet(
       w.name,
       '<p>' +
         dateText(w.day, { weekday: 'long', month: 'long', day: 'numeric' }) +
@@ -377,9 +447,16 @@ export function buildForms(env) {
           .filter((i) => i.sets.some((t) => t.done))
           .map(
             (i) =>
-              '<div class="plan-item"><strong>' +
+              '<div class="plan-item"><div class="row-between"><strong>' +
               esc(i.name) +
-              '</strong><div class="history-sets">' +
+              '</strong>' +
+              smallBtn(
+                'manage-exercise',
+                'Manage ' + i.name,
+                'menu',
+                'data-workout="' + w.id + '" data-entry="' + i.entryId + '"',
+              ) +
+              '</div><div class="history-sets">' +
               i.sets
                 .filter((t) => t.done)
                 .map(
@@ -398,8 +475,143 @@ export function buildForms(env) {
               '</div></div>',
           )
           .join('') +
-        '</div>',
+        '</div>' +
+        btn(
+          'inline',
+          'Delete workout',
+          'text-btn danger',
+          'data-delete-workout',
+        ),
     );
+    detail.dataset.historyId = id;
+    detail.querySelector('[data-delete-workout]').onclick = () =>
+      confirm(
+        'Delete this workout?',
+        'Delete “' +
+          w.name +
+          '” and its logged sets from History and exercise graphs?',
+        'Delete workout',
+        async () => {
+          await save((s) => {
+            s.sessions = s.sessions.filter((x) => x.id !== id);
+          });
+          detail.close();
+          toast('Workout deleted');
+        },
+      );
+  }
+  function manageExercise(workoutId, entryId) {
+    const active = state().active?.id === workoutId;
+    const getWorkout = (s) =>
+      active
+        ? s.active?.id === workoutId
+          ? s.active
+          : null
+        : s.sessions.find((w) => w.id === workoutId);
+    const workout = getWorkout(state());
+    const item = workout?.items.find((i) => i.entryId === entryId);
+    if (!item) throw Error('This exercise is no longer in the workout.');
+    const options = sheet(
+      item.name,
+      '<div class="list">' +
+        item.sets
+          .map((set, index) =>
+            !active && !set.done
+              ? ''
+              : '<div class="row"><div><strong>Set ' +
+                (index + 1) +
+                '</strong><small class="set-description">' +
+                fmt(displayWeight(set.kg, state().unit)) +
+                ' ' +
+                state().unit +
+                ' × ' +
+                set.reps +
+                ' · ' +
+                set.rir +
+                ' RIR</small></div>' +
+                smallBtn(
+                  'inline',
+                  'Remove set ' + (index + 1),
+                  'bin',
+                  'data-remove-set="' + set.entryId + '"',
+                ) +
+                '</div>',
+          )
+          .join('') +
+        '</div>' +
+        btn(
+          'inline',
+          'Remove exercise from workout',
+          'text-btn danger',
+          'data-remove-exercise',
+        ),
+    );
+    options.onclick = (event) => {
+      const button = event.target.closest(
+        '[data-remove-set], [data-remove-exercise]',
+      );
+      if (!button) return;
+      const setId = button.dataset.removeSet;
+      const removed = setId
+        ? item.sets.filter((set) => set.entryId === setId)
+        : item.sets;
+      const count = removed.filter((set) => set.done).length;
+      const deletesWorkout = !active && doneSets(workout).length === count;
+      const subject = setId ? 'set' : 'exercise';
+      const message = deletesWorkout
+        ? 'This removes the last logged set from “' +
+          workout.name +
+          '” and deletes that workout from History.'
+        : 'Remove this ' + subject + ' from “' + workout.name + '”?';
+      confirm(
+        'Remove ' + subject + '?',
+        message,
+        deletesWorkout ? 'Delete workout' : 'Remove ' + subject,
+        async () => {
+          await save((s) => {
+            const w = getWorkout(s);
+            const row = w?.items.find((i) => i.entryId === entryId);
+            if (
+              !row ||
+              (setId && !row.sets.some((set) => set.entryId === setId))
+            )
+              throw Error('This entry was already removed.');
+            const removedSets = setId
+              ? row.sets.filter((set) => set.entryId === setId)
+              : row.sets;
+            row.sets = row.sets.filter((set) => !removedSets.includes(set));
+            if (
+              !row.sets.length ||
+              (!active && !row.sets.some((set) => set.done))
+            )
+              w.items = w.items.filter((i) => i !== row);
+            if (
+              active &&
+              (!w.items.length ||
+                removedSets.some((set) => set.entryId === w.restSetId))
+            ) {
+              w.restUntil = 0;
+              w.restSetId = null;
+            }
+            if (!active && !doneSets(w).length) {
+              if (!deletesWorkout)
+                throw Error(
+                  'The workout changed. Reopen it to confirm deleting the last set.',
+                );
+              s.sessions = s.sessions.filter((x) => x.id !== workoutId);
+            }
+          });
+          options.close();
+          if (!active) {
+            document
+              .querySelector('dialog[data-history-id="' + workoutId + '"]')
+              ?.close();
+            await sessionDetails(workoutId);
+          }
+          toast(deletesWorkout ? 'Workout deleted' : 'Removed from workout');
+        },
+      );
+    };
   }
   function settings() {
     const unit = state().unit;
@@ -552,6 +764,7 @@ export function buildForms(env) {
     goals,
     weigh,
     sessionDetails,
+    manageExercise,
     settings,
     sessionExercise,
   };

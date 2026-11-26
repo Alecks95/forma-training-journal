@@ -118,7 +118,7 @@ export function field(label, key, value, props = {}) {
     '></label>'
   );
 }
-export function plot(points, unit, { short = false } = {}) {
+export function plot(points, unit, { short = false, selectedSet = null } = {}) {
   if (!points.length)
     return (
       '<div class="empty-chart ' +
@@ -127,19 +127,27 @@ export function plot(points, unit, { short = false } = {}) {
       icon('exercises', 29) +
       '</span><small>Awaiting first entry</small></div>'
     );
-  const width = 520,
-    height = short ? 105 : 190,
+  const bySet = selectedSet !== null;
+  const width = bySet ? 360 : 520,
+    height = short ? 105 : bySet ? 150 : 190,
     left = 47,
     right = 16,
     top = 16,
     bottom = 26;
   const values = points.map((p) => p.value),
-    lo = Math.min(...values),
-    hi = Math.max(...values);
+    lo = values.reduce((a, b) => Math.min(a, b)),
+    hi = values.reduce((a, b) => Math.max(a, b));
   const spread = hi - lo || Math.max(Math.abs(hi) * 0.05, 1),
-    min = Math.max(0, lo - spread * 0.18),
-    max = hi + spread * 0.18;
-  const times = points.map((p) => new Date(p.day + 'T12:00:00').getTime()),
+    step = unit === 'reps' ? Math.max(1, Math.ceil(spread / 2)) : spread / 2,
+    min = bySet
+      ? Math.max(0, Math.floor(lo / step) * step)
+      : Math.max(0, lo - spread * 0.18),
+    max = bySet
+      ? Math.max(min + 2 * step, Math.ceil(hi / step) * step)
+      : hi + spread * 0.18;
+  const times = points.map((p, i) =>
+      bySet ? i : new Date(p.day + 'T12:00:00').getTime(),
+    ),
     end = times.at(-1) - times[0];
   const x = (i) =>
     left + (end ? (times[i] - times[0]) / end : 0.5) * (width - left - right);
@@ -147,7 +155,13 @@ export function plot(points, unit, { short = false } = {}) {
   const line = points
     .map((p, i) => x(i).toFixed(2) + ',' + y(p.value).toFixed(2))
     .join(' ');
-  const grids = [max, (max + min) / 2, min]
+  const ticks = bySet
+    ? Array.from(
+        { length: Math.round((max - min) / step) + 1 },
+        (_, i) => min + i * step,
+      )
+    : [max, (max + min) / 2, min];
+  const grids = ticks
     .map(
       (v) =>
         '<line x1="' +
@@ -167,6 +181,38 @@ export function plot(points, unit, { short = false } = {}) {
         '</text>',
     )
     .join('');
+  const axisLabel = (i) => (bySet ? 'Set ' + (i + 1) : dateText(points[i].day));
+  const selection = bySet
+    ? '<line class="selected-guide" x1="' +
+      x(selectedSet) +
+      '" x2="' +
+      x(selectedSet) +
+      '" y1="' +
+      top +
+      '" y2="' +
+      (height - bottom) +
+      '"/>'
+    : '';
+  const targets = bySet
+    ? points
+        .map((p, i) => {
+          const start = i ? (x(i - 1) + x(i)) / 2 : left;
+          const stop =
+            i + 1 < points.length ? (x(i) + x(i + 1)) / 2 : width - right;
+          return (
+            '<rect data-chart-set="' +
+            i +
+            '" x="' +
+            start +
+            '" y="0" width="' +
+            (stop - start) +
+            '" height="' +
+            height +
+            '" fill="transparent"/>'
+          );
+        })
+        .join('')
+    : '';
   const dots = points
     .map(
       (p, i) =>
@@ -174,9 +220,11 @@ export function plot(points, unit, { short = false } = {}) {
         x(i) +
         '" cy="' +
         y(p.value) +
-        '" r="' +
-        (points.length > 35 ? 1.5 : 3.5) +
-        '"><title>' +
+        '" ' +
+        (selectedSet === i
+          ? 'class="selected-point" r="5"'
+          : 'r="' + (points.length > 35 ? 1.5 : 3.5) + '"') +
+        '><title>' +
         dateText(p.day) +
         ': ' +
         fmt(p.value) +
@@ -191,8 +239,10 @@ export function plot(points, unit, { short = false } = {}) {
       unit +
         ' trend, ' +
         points.length +
-        ' entries, latest ' +
-        fmt(values.at(-1)) +
+        (bySet
+          ? ' sets, selected set ' + (selectedSet + 1) + ', '
+          : ' entries, latest ') +
+        fmt(bySet ? values[selectedSet] : values.at(-1)) +
         ' ' +
         unit,
     ) +
@@ -202,6 +252,7 @@ export function plot(points, unit, { short = false } = {}) {
     height +
     '">' +
     grids +
+    selection +
     '<polygon points="' +
     x(0) +
     ',' +
@@ -217,11 +268,11 @@ export function plot(points, unit, { short = false } = {}) {
     '"/>' +
     dots +
     '<text x="' +
-    left +
+    (points.length === 1 && bySet ? x(0) : left) +
     '" y="' +
     (height - 4) +
-    '">' +
-    dateText(points[0].day) +
+    (points.length === 1 && bySet ? '" text-anchor="middle">' : '">') +
+    axisLabel(0) +
     '</text>' +
     (points.length > 1
       ? '<text x="' +
@@ -229,9 +280,10 @@ export function plot(points, unit, { short = false } = {}) {
         '" y="' +
         (height - 4) +
         '" text-anchor="end">' +
-        dateText(points.at(-1).day) +
+        axisLabel(points.length - 1) +
         '</text>'
       : '') +
+    targets +
     '</svg>'
   );
 }

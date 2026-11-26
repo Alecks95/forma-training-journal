@@ -81,6 +81,18 @@ export function startSession(routine, state) {
 }
 export const doneSets = (session) =>
   session.items.flatMap((e) => e.sets.filter((s) => s.done));
+export function keyWorkoutRows(workout) {
+  let changed = false;
+  for (const item of workout.items) {
+    for (const row of [item, ...item.sets]) {
+      if (!row.entryId) {
+        row.entryId = uid();
+        changed = true;
+      }
+    }
+  }
+  return changed;
+}
 export function weeklyWeights(weights) {
   const weeks = new Map();
   for (const w of weights) {
@@ -95,21 +107,27 @@ export function weeklyWeights(weights) {
     .map((w) => ({ ...w, value: w.sum / w.count }));
 }
 export function progression(sessions, exerciseId) {
-  const days = new Map();
-  for (const session of sessions) {
-    const sets = session.items
-      .filter((i) => i.exerciseId === exerciseId)
-      .flatMap((i) => i.sets)
-      .filter((s) => s.done);
-    if (!sets.length) continue;
-    const d = days.get(session.day) || { day: session.day, kg: 0, reps: 0 };
-    for (const s of sets) {
-      d.kg = Math.max(d.kg, s.kg);
-      d.reps = Math.max(d.reps, s.reps);
+  const sets = [];
+  const chronological = [...sessions].sort(
+    (a, b) =>
+      a.day.localeCompare(b.day) || a.started - b.started || a.ended - b.ended,
+  );
+  for (const session of chronological) {
+    for (const item of session.items) {
+      if (item.exerciseId !== exerciseId) continue;
+      item.sets.forEach((set, index) => {
+        if (set.done)
+          sets.push({
+            day: session.day,
+            workout: session.name,
+            setNumber: index + 1,
+            kg: set.kg,
+            reps: set.reps,
+          });
+      });
     }
-    days.set(d.day, d);
   }
-  return [...days.values()].sort((a, b) => a.day.localeCompare(b.day));
+  return sets;
 }
 export function dailyNutrition(meals, day) {
   return meals
@@ -172,21 +190,34 @@ export function validState(s) {
       numeric(x.started, 1, 1e14) &&
       numeric(x.restUntil, 0, 1e14) &&
       Array.isArray(x.items) &&
+      unique(
+        x.items.filter((item) => item.entryId !== undefined),
+        'entryId',
+      ) &&
       x.items.every(
         (i) =>
-          hasExercise(i.exerciseId) &&
+          idOk(i.exerciseId) &&
+          (i.entryId === undefined || idOk(i.entryId)) &&
           nameOk(i.name) &&
           integer(i.rest, 0, 3600) &&
           Array.isArray(i.sets) &&
           i.sets.length > 0 &&
-          i.sets.every((set) => targetOk(set) && typeof set.done === 'boolean'),
+          unique(
+            i.sets.filter((set) => set.entryId !== undefined),
+            'entryId',
+          ) &&
+          i.sets.every(
+            (set) =>
+              targetOk(set) &&
+              typeof set.done === 'boolean' &&
+              (set.entryId === undefined || idOk(set.entryId)),
+          ),
       );
     return (
       s.exercises.every(planOk) &&
       s.routines.every(
         (r) =>
           Array.isArray(r.items) &&
-          r.items.length > 0 &&
           r.items.every((i) => hasExercise(i.exerciseId) && planOk(i)),
       ) &&
       s.foods.every((f) => nameOk(f.portion) && nutritionOk(f)) &&
@@ -237,7 +268,10 @@ export function updateJournal(change) {
         result = req.result || initialState();
         const replacement = change?.(result);
         if (replacement) result = replacement;
-        if (change || !req.result) store.put(result, 'state');
+        // Older sessions identify rows by position. Give each occurrence a stable
+        // identity before displaying it, including duplicate exercises in a workout.
+        const keyed = result.active && keyWorkoutRows(result.active);
+        if (change || !req.result || keyed) store.put(result, 'state');
       } catch (e) {
         problem = e;
         tx.abort();

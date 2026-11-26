@@ -6,7 +6,7 @@
   --line: #272729;
   --text: #fafafa;
   --muted: #a2a2aa;
-  --accent: #d6d7da;
+  --accent: #deca84;
   --primary: #252628;
   --green: #98b6a6;
   --sans:
@@ -134,7 +134,9 @@ header {
   color: #fff;
 }
 nav {
-  display: grid;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
   gap: 4px;
 }
 .nav-link {
@@ -152,7 +154,7 @@ nav {
   color: white;
 }
 .nav-link.active {
-  color: #f3f3f4;
+  color: var(--accent);
   font-weight: 700;
   background: #1d1d1f;
 }
@@ -175,9 +177,6 @@ nav {
   gap: 12px;
   padding: 10px 15px;
   font-size: 15px;
-}
-.settings:after {
-  content: 'Settings';
 }
 main {
   width: calc(100% - 206px);
@@ -613,6 +612,21 @@ small,
 .chart circle {
   fill: var(--accent);
 }
+.chart:has([data-chart-set]) {
+  cursor: pointer;
+}
+.chart .selected-guide {
+  stroke: var(--accent);
+  opacity: 0.55;
+}
+.chart .selected-point {
+  fill: var(--bg);
+  stroke: var(--accent);
+  stroke-width: 3px;
+}
+.set-description {
+  display: block;
+}
 .empty-chart {
   height: 144px;
   display: flex;
@@ -667,6 +681,7 @@ small,
   color: #d3d3d7;
 }
 .rest-bar strong {
+  color: var(--accent);
   font-variant-numeric: tabular-nums;
 }
 .rest-bar .button {
@@ -754,9 +769,12 @@ small,
   border-radius: 5px;
 }
 .done .set-check svg {
-  color: #bdd0c4;
-  background: #1c2822;
-  border-color: #405247;
+  color: var(--accent);
+  background: #272419;
+  border-color: #5b5336;
+}
+.set-check[aria-pressed='false'] path {
+  visibility: hidden;
 }
 .done input {
   color: #bcbcbf;
@@ -958,52 +976,30 @@ dialog::backdrop {
     grid-template-columns: minmax(145px, 0.7fr) minmax(230px, 1.4fr);
   }
 }
-@media (max-width: 720px) {
-  header {
-    position: static;
-    width: 100%;
-    background: #000;
-    border: 0;
-  }
+@media (max-width: 720px),
+  (pointer: coarse) and (max-height: 520px) and (max-width: 1000px) {
+  header,
   .bar {
-    height: 48px;
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-    padding: 7px 16px 0;
+    display: contents;
   }
   .brand {
-    font-size: 17px;
-    margin: 0;
-    gap: 7px;
-    letter-spacing: -0.6px;
-  }
-  .app-symbol {
-    width: 23px;
-    height: 23px;
-    font-size: 17px;
-    border-radius: 5px;
+    display: none;
   }
   .settings {
     margin: 0;
-    padding: 4px;
-    min-width: 40px;
-    min-height: 40px;
-  }
-  .settings:after {
-    display: none;
+    align-self: stretch;
   }
   nav {
     position: fixed;
     z-index: 4;
     inset: auto 0 0;
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: 0;
     background: #111113f8;
     border-top: 1px solid #323236;
-    padding: 3px 2px max(4px, env(safe-area-inset-bottom));
+    padding: 3px max(2px, env(safe-area-inset-right))
+      max(4px, env(safe-area-inset-bottom)) max(2px, env(safe-area-inset-left));
     backdrop-filter: blur(16px);
   }
   .nav-link,
@@ -1024,7 +1020,10 @@ dialog::backdrop {
   main {
     margin: 0;
     width: 100%;
-    padding: 13px 16px calc(80px + env(safe-area-inset-bottom));
+    padding: calc(16px + env(safe-area-inset-top))
+      max(16px, env(safe-area-inset-right))
+      calc(80px + env(safe-area-inset-bottom))
+      max(16px, env(safe-area-inset-left));
   }
   .page-head {
     margin-bottom: 21px;
@@ -1124,6 +1123,7 @@ dialog::backdrop {
     gap: 10px;
   }
   .rest-bar {
+    top: env(safe-area-inset-top);
     padding: 2px 0;
   }
   .run-footer {
@@ -1139,7 +1139,7 @@ dialog::backdrop {
     margin: auto 0 0;
     width: 100%;
     max-width: none;
-    max-height: 91dvh;
+    max-height: min(91dvh, calc(100dvh - env(safe-area-inset-top) - 8px));
     border-radius: 15px 15px 0 0;
   }
   .icon-button {
