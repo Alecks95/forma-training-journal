@@ -50,6 +50,8 @@ class Handler(SimpleHTTPRequestHandler):
             manifest = json.loads(body)
             manifest.update(name=variants[variant],short_name=variants[variant])
             body = json.dumps(manifest).encode()
+        elif name == 'style.css' and Handler.mode == 'scheme':
+            body = body.replace(b'color-scheme: dark', b'color-scheme: normal') + b'\nbutton, input, select, dialog {color-scheme:dark}'
         elif name == 'sw.js':
             self.send_error(404)
             return
@@ -65,8 +67,29 @@ class Handler(SimpleHTTPRequestHandler):
                 time.sleep(6)
             if mode != 'install':
                 # A new, distinct marker proves when each response first reaches the screen.
-                color = {'control':'red','control-delay':'blue','theme':'lime','theme-delay':'magenta'}[mode]
+                color = {'control':'red','scheme':'lime','blocking':'blue','bare':'magenta','stream':'cyan'}[mode]
+                if mode == 'scheme':
+                    html = html.replace('<meta name="color-scheme" content="dark" />','').replace('color-scheme: dark','color-scheme: normal')
+                if mode == 'blocking':
+                    html = html.replace('media="print"','media="all"')
+                    html = html.replace('<main id="main" tabindex="-1">','<main id="main" tabindex="-1"><h1>Workout</h1>')
+                if mode in ('bare','stream'):
+                    html = """<!doctype html><html style="background:#000"><head><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#000000"><style>html,body{background:#000;color:white;margin:0}</style></head><body><main style="padding:70px 20px">Workout</main></body></html>"""
                 html = html.replace('</body>', '<i style="position:fixed;left:44%;top:65%;width:12%;height:20px;z-index:99999;background:'+color+'"></i></body>')
+                if mode == 'stream':
+                    prefix,tail = html.split('<main',1)
+                    prefix=(prefix+'<div style="height:1px;background:#000"></div>').encode()
+                    tail=('<main'+tail).encode()
+                    self.send_response(200)
+                    self.send_header('Cache-Control','no-store')
+                    self.send_header('Content-Type','text/html; charset=utf-8')
+                    self.send_header('Content-Length',str(len(prefix)+len(tail)))
+                    self.end_headers()
+                    self.wfile.write(prefix); self.wfile.flush()
+                    time.sleep(1.25)
+                    self.wfile.write(tail)
+                    print('RESPONSE',mode,time.time(),flush=True)
+                    return
             print('RESPONSE', mode, time.time(), flush=True)
             probe = """<script>addEventListener('load',()=>setTimeout(()=>fetch('/geometry/VARIANT',{method:'POST',body:JSON.stringify({reduced:matchMedia('(prefers-reduced-motion: reduce)').matches,standalone:navigator.standalone,height:innerHeight,screen:screen.height,inset:getComputedStyle(document.documentElement,'::before').height,launchImages:document.querySelectorAll('[rel=apple-touch-startup-image]').length,theme:document.querySelector('[name=apple-mobile-web-app-status-bar-style]').content})}),650))</script>""".replace("VARIANT",variant)
             html = html.replace('</body>',probe+'</body>')

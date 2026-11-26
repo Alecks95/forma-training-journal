@@ -63,45 +63,15 @@ final class LaunchTests: XCTestCase {
     func testHomeLaunch() throws {
         continueAfterFailure = false
         let icon = try install("upgrade", name: "Form Update")
-        try record("mode","upgrade-theme")
-        for mode in ["dark", "light", "opaque"] {
-            try record("appearance","upgrade-"+(mode == "light" ? "light" : "dark"))
-            if mode == "opaque" {
-                let settings = XCUIApplication(bundleIdentifier: "com.apple.Preferences")
-                settings.launch()
-                let access = settings.cells.containing(.staticText, identifier: "Accessibility").firstMatch
-                for _ in 0..<6 {
-                    if access.exists && access.isHittable {break}
-                    settings.swipeUp()
-                }
-                guard access.exists && access.isHittable else {snapshot("Settings",settings);throw Failure.missing("Accessibility")}
-                access.tap()
-                let motion = settings.staticTexts["Display & Text Size"].firstMatch
-                guard motion.waitForExistence(timeout:8) else {snapshot("Accessibility",settings);throw Failure.missing("Display & Text Size")}
-                motion.tap()
-                let toggle = settings.switches.containing(.staticText, identifier:"Reduce Transparency").firstMatch
-                let named = settings.switches["Reduce Transparency"].firstMatch
-                let item = named.exists ? named : toggle
-                for _ in 0..<4 {
-                    if item.exists && item.isHittable { break }
-                    settings.swipeUp()
-                }
-                guard item.exists && item.isHittable else {snapshot("Display",settings);throw Failure.missing("Reduce Transparency")}
-                if (item.value as? String) != "1" {item.tap()}
-                XCTAssertEqual(item.value as? String,"1")
-                snapshot("Reduce-Transparency-enabled",settings)
-                XCUIDevice.shared.press(.home)
-                for _ in 0..<4 {if icon.exists && icon.isHittable {break};spring.swipeLeft()}
-            }
-            for kind in ["first","warm","cold","again"] {
-                let label="upgrade-"+mode+"-"+kind
-                if kind != "warm" {try record("terminate",label)}
-                try record("start", label)
-                icon.tap()
-                Thread.sleep(forTimeInterval:4)
-                try record("stop", label)
-                XCUIDevice.shared.press(.home)
-            }
+        for (index,mode) in ["control","scheme","blocking","bare","stream","scheme","bare","blocking","stream","control"].enumerated() {
+            let label="upgrade-"+String(index)
+            try record("mode","upgrade-"+mode)
+            try record("terminate",label)
+            try record("start",label)
+            icon.tap()
+            Thread.sleep(forTimeInterval:mode.hasSuffix("delay") ? 10 : 5)
+            try record("stop",label)
+            XCUIDevice.shared.press(.home)
         }
     }
     enum Failure: Error {case missing(String)}
