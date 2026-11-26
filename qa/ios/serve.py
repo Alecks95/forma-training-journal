@@ -7,6 +7,7 @@ import json, mimetypes, os, re, time
 
 # All shipped app files, including the offline worker, come from these releases.
 revisions = {'first': 'dea359f', 'middle': '739a262', 'today': '9a705ae', 'classic': '9a705ae'}
+revisions.update(prelogo='9bcb5b4', animated='ea8e232', direct='c623dc4', recorded='45ccd34')
 names = {'first': 'Form First', 'middle': 'Form Middle', 'today': 'Form Today'}
 served = {k: k for k in names}
 sim = os.environ['SIM']
