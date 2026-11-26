@@ -19,6 +19,8 @@ class Handler(SimpleHTTPRequestHandler):
             return
         if action == 'mode':
             Handler.mode = name.partition('-')[2]
+        elif action == 'appearance':
+            run(['xcrun','simctl','ui',sim,'appearance',name.partition('-')[2]],check=True)
         elif action == 'terminate':
             result = run(['xcrun','simctl','terminate',sim,'com.apple.webapp'],capture_output=True,text=True)
             print('TERMINATE',name,result.returncode,result.stderr,flush=True)
