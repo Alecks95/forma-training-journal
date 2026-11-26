@@ -62,9 +62,14 @@ final class LaunchTests: XCTestCase {
     }
     func testHomeLaunch() throws {
         continueAfterFailure = false
-        for (variant,name) in [("current","Form"),("plain","Form Plain"),("theme","Form Theme")] {
+        for (variant,name) in [("snapshot","Form Snapshot"),("legacy","Form Existing")] {
             let icon = try install(variant,name:name)
             for label in [variant,variant+"-warm"] {
+                if variant == "legacy" && label.hasSuffix("-warm") {
+                    try record("upgrade", variant)
+                    let webApp=XCUIApplication(bundleIdentifier:"com.apple.webapp")
+                    if webApp.state != .notRunning { webApp.terminate() }
+                }
                 try record("start", label)
                 icon.tap()
                 Thread.sleep(forTimeInterval:1.5)
