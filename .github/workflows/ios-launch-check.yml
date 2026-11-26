@@ -35,7 +35,7 @@ jobs:
           python3 serve.py > "$RUNNER_TEMP/form-launch/server.log" 2>&1 &
           server=$!
           trap 'kill "$server" 2>/dev/null || true' EXIT
-          for n in {1..15}; do curl -fsS -o /dev/null http://127.0.0.1:8765/current/ && break; sleep 1; done
+          for n in {1..15}; do curl -fsS -o /dev/null http://127.0.0.1:8765/upgrade/ && break; sleep 1; done
           xcodebuild -scheme FormLaunch -destination "id=$SIM" -derivedDataPath "$RUNNER_TEMP/form-dd" -parallel-testing-enabled NO -resultBundlePath "$RUNNER_TEMP/form-results.xcresult" test-without-building | tee "$RUNNER_TEMP/form-launch/test.log"
       - if: always()
         name: Collect simulator evidence

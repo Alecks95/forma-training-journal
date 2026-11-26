@@ -62,17 +62,16 @@ final class LaunchTests: XCTestCase {
     }
     func testHomeLaunch() throws {
         continueAfterFailure = false
-        for (variant,name) in [("current","Form"),("plain","Form Plain"),("theme","Form Theme"),("snapshot","Form Snapshot"),("legacy","Form Existing")] {
+        for (variant,name) in [("upgrade","Form Update"),("snapshot","Form Snapshot")] {
             let icon = try install(variant,name:name)
-            for label in [variant,variant+"-warm"] {
-                if variant == "legacy" && label.hasSuffix("-warm") {
-                    try record("upgrade", variant)
-                    let webApp=XCUIApplication(bundleIdentifier:"com.apple.webapp")
-                    if webApp.state != .notRunning { webApp.terminate() }
-                }
+            let series = variant == "upgrade" ? ["first","warm","cold","receive","updated","again"] : ["first","warm","cold","again"]
+            for kind in series {
+                let label=variant+"-"+kind
+                if kind == "receive" { try record("upgrade", variant) }
+                if kind != "first" && kind != "warm" {try record("terminate",label)}
                 try record("start", label)
                 icon.tap()
-                Thread.sleep(forTimeInterval:5)
+                Thread.sleep(forTimeInterval:kind == "receive" ? 12 : 6)
                 try record("stop", label)
                 let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
                 attachment.name = "Opened-"+label;attachment.lifetime = .keepAlways;add(attachment)

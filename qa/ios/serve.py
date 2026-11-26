@@ -7,17 +7,21 @@ import json, os, re, signal, time
 dist = Path(__file__).resolve().parents[2] / 'forma/dist'
 out = Path(os.environ['RUNNER_TEMP']) / 'form-launch'
 sim = os.environ['SIM']
-variants = {'current': 'Form', 'plain': 'Form Plain', 'theme': 'Form Theme', 'snapshot': 'Form Snapshot', 'legacy': 'Form Existing'}
+variants = {'upgrade': 'Form Update', 'snapshot': 'Form Snapshot'}
 class Handler(SimpleHTTPRequestHandler):
     recorder = None
     upgraded = False
     def do_POST(self):
         action, _, name = self.path.strip('/').partition('/')
-        if name not in variants and not any(name == k+'-warm' for k in variants):
+        variant=name.split('-')[0]
+        if variant not in variants:
             self.send_error(404)
             return
-        if action == 'upgrade' and name == 'legacy':
+        if action == 'upgrade' and name == 'upgrade':
             Handler.upgraded = True
+        elif action == 'terminate':
+            result = run(['xcrun','simctl','terminate',sim,'com.apple.webapp'],capture_output=True,text=True)
+            print('TERMINATE',name,result.returncode,result.stderr,flush=True)
         elif action == 'geometry':
             message = self.rfile.read(int(self.headers.get('Content-Length',0)))
             print('GEOMETRY',name,message.decode(),flush=True)
@@ -44,20 +48,16 @@ class Handler(SimpleHTTPRequestHandler):
             manifest = json.loads(body)
             manifest.update(name=variants[variant],short_name=variants[variant])
             body = json.dumps(manifest).encode()
-        elif name == 'sw.js' and variant == 'legacy':
-            body = b'// Isolate the installation metadata test from offline storage.'
+        elif name == 'sw.js' and variant == 'upgrade' and Handler.upgraded:
+            body = body.replace(b"'v16'",b"'v17'")
         elif name == 'index.html' and variant != 'current':
             html = body.decode().replace('content="Form"','content="'+variants[variant]+'"')
             if variant == 'theme':
                 html = html.replace(' media="(display-mode: browser)"','')
-            if variant == 'snapshot':
+            if variant == 'snapshot' or (variant == 'upgrade' and Handler.upgraded):
                 html = re.sub(r' *<link rel="apple-touch-startup-image"[^>]*>\n','',html)
-            if variant == 'legacy':
-                if not Handler.upgraded:
-                    html = html.replace('content="black-translucent"','content="black"')
-                # Observe settled native geometry without drawing or animating anything.
-                probe = """<script>addEventListener('load',()=>setTimeout(()=>fetch('/geometry/legacy',{method:'POST',body:JSON.stringify({standalone:navigator.standalone,height:innerHeight,screen:screen.height,inset:getComputedStyle(document.documentElement,'::before').height,style:document.querySelector('[name=apple-mobile-web-app-status-bar-style]').content})}),900))</script>"""
-                html = html.replace('</body>',probe+'</body>')
+            probe = """<script>addEventListener('load',()=>setTimeout(()=>fetch('/geometry/VARIANT',{method:'POST',body:JSON.stringify({standalone:navigator.standalone,height:innerHeight,screen:screen.height,inset:getComputedStyle(document.documentElement,'::before').height,launchImages:document.querySelectorAll('[rel=apple-touch-startup-image]').length,theme:document.querySelector('[name=apple-mobile-web-app-status-bar-style]').content})}),650))</script>""".replace("VARIANT",variant)
+            html = html.replace('</body>',probe+'</body>')
             if variant == 'plain':
                 html = html[:html.index('    <link\n      id="app-styles"')] + '</head><body style="background:black"><p style="padding:90px 16px;color:white">Workout</p></body></html>'
             body = html.encode()
