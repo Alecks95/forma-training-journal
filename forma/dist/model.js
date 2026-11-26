@@ -31,7 +31,6 @@ export function initialState() {
     name,
     sets: 3,
     reps,
-    kg: 0,
     rir: 2,
     rest,
   }));
@@ -72,7 +71,7 @@ export function startSession(routine, state) {
       rest: item.rest,
       sets: Array.from({ length: item.sets }, () => ({
         reps: item.reps,
-        kg: item.kg,
+        kg: null,
         rir: item.rir,
         done: false,
       })),
@@ -151,8 +150,7 @@ const dayOk = (x) =>
   typeof x === 'string' &&
   /^\d{4}-\d{2}-\d{2}$/.test(x) &&
   localDay(dateAt(x)) === x;
-const targetOk = (x) =>
-  integer(x.reps, 1, 999) && numeric(x.kg, 0, 100000) && integer(x.rir, 0, 20);
+const targetOk = (x) => integer(x.reps, 1, 999) && integer(x.rir, 0, 20);
 const planOk = (x) =>
   targetOk(x) && integer(x.sets, 1, 100) && integer(x.rest, 0, 3600);
 const nutritionOk = (x) => macros.every((k) => numeric(x[k], 0, 1000000));
@@ -209,6 +207,7 @@ export function validState(s) {
           i.sets.every(
             (set) =>
               targetOk(set) &&
+              (numeric(set.kg, 0, 100000) || (set.kg === null && !set.done)) &&
               typeof set.done === 'boolean' &&
               (set.entryId === undefined || idOk(set.entryId)),
           ),

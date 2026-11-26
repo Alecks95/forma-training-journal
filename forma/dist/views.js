@@ -1,5 +1,6 @@
 import {
   localDay,
+  dateAt,
   monday,
   shiftDay,
   displayWeight,
@@ -64,36 +65,28 @@ function listRow(glyph, title, sub, actions = '') {
 }
 const totalSets = (r) => r.items.reduce((a, i) => a + i.sets, 0);
 const sortedSessions = (s) => [...s.sessions].sort((a, b) => b.ended - a.ended);
-function history(s, limit = Infinity) {
-  const list = sortedSessions(s).slice(0, limit);
+function daySessions(list) {
   return rows(
-    list.length
-      ? list
-          .map((w) =>
-            btn(
-              'session-detail',
-              rowInner(
-                'workouts',
-                w.name,
-                dateText(w.day, {
-                  weekday: 'short',
-                  month: 'short',
-                  day: 'numeric',
-                }) +
-                  ' · ' +
-                  doneSets(w).length +
-                  ' sets',
-              ) + icon('chevron', 16),
-              'row row-link',
-              idAttr(w.id),
-            ),
-          )
-          .join('')
-      : infoRow(
-          'history',
-          'No sessions logged yet',
-          'Your completed workouts will appear here.',
+    list
+      .map((w) =>
+        btn(
+          'session-detail',
+          rowInner(
+            'workouts',
+            w.name,
+            new Date(w.started).toLocaleTimeString(undefined, {
+              hour: 'numeric',
+              minute: '2-digit',
+            }) +
+              ' · ' +
+              doneSets(w).length +
+              ' sets',
+          ) + icon('chevron', 16),
+          'row row-link',
+          idAttr(w.id),
         ),
+      )
+      .join(''),
   );
 }
 function workoutScreen(s, c) {
@@ -132,9 +125,7 @@ function workoutScreen(s, c) {
         i.reps +
         ' reps · ' +
         i.rir +
-        ' RIR</small></div><span class="routine-load">' +
-        (i.kg ? fmt(displayWeight(i.kg, s.unit)) + ' ' + s.unit : '—') +
-        '<small>' +
+        ' RIR</small></div><span class="routine-load"><small>' +
         clockText(i.rest) +
         ' rest</small></span></li>'
       );
@@ -204,14 +195,102 @@ function workoutScreen(s, c) {
         ))
   );
 }
-function historyScreen(s) {
+function historyScreen(s, c) {
+  const today = day();
+  const month = c.historyMonth || today.slice(0, 7);
+  const first = month + '-01';
+  const start = dateAt(first);
+  const next = new Date(start.getFullYear(), start.getMonth() + 1, 1, 12);
+  const daysInMonth = new Date(
+    start.getFullYear(),
+    start.getMonth() + 1,
+    0,
+  ).getDate();
+  const offset = (start.getDay() + 6) % 7;
+  const sessions = sortedSessions(s).filter((w) =>
+    w.day.startsWith(month + '-'),
+  );
+  const counts = new Map();
+  for (const w of sessions) counts.set(w.day, (counts.get(w.day) || 0) + 1);
+  const monthName = dateText(first, { month: 'long', year: 'numeric' });
+  const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+    .map((d) => '<span class="weekday">' + d + '</span>')
+    .join('');
+  const cells = Array.from({ length: daysInMonth }, (_, i) => {
+    const date = month + '-' + String(i + 1).padStart(2, '0');
+    const count = counts.get(date);
+    const cls = 'calendar-day' + (date === today ? ' today' : '');
+    const current = date === today ? ' aria-current="date"' : '';
+    const firstColumn =
+      i === 0 ? ' style="grid-column-start:' + (offset + 1) + '"' : '';
+    if (!count)
+      return (
+        '<span class="' +
+        cls +
+        '"' +
+        firstColumn +
+        current +
+        '>' +
+        (i + 1) +
+        '</span>'
+      );
+    return btn(
+      'history-day',
+      String(i + 1),
+      cls + ' trained',
+      'data-day="' +
+        date +
+        '" aria-label="' +
+        dateText(date, { month: 'long', day: 'numeric', year: 'numeric' }) +
+        ', ' +
+        count +
+        (count === 1 ? ' workout' : ' workouts') +
+        '" aria-pressed="' +
+        (date === c.historyDay) +
+        '"' +
+        current +
+        firstColumn,
+    );
+  }).join('');
+  const selected = sessions.filter((w) => w.day === c.historyDay);
   return (
     head('History') +
-    sect(
-      'Completed workouts',
-      '<span class="caption">' + s.sessions.length + ' total</span>',
+    '<div class="activity-history"><section class="activity-calendar" aria-label="Workout calendar"><div class="card-top">' +
+    '<h2 aria-live="polite">' +
+    monthName +
+    '</h2><div class="button-row">' +
+    smallBtn(
+      'history-month',
+      'Previous month',
+      'left',
+      'data-month="' + shiftDay(first, -1).slice(0, 7) + '"',
     ) +
-    history(s)
+    smallBtn(
+      'history-month',
+      'Next month',
+      'chevron',
+      'data-month="' +
+        localDay(next).slice(0, 7) +
+        '"' +
+        (month >= today.slice(0, 7) ? ' disabled' : ''),
+    ) +
+    '</div></div><div class="calendar-grid">' +
+    weekdays +
+    cells +
+    '</div><div class="calendar-key"><span>Workout day</span><span>' +
+    sessions.length +
+    (sessions.length === 1 ? ' workout' : ' workouts') +
+    ' this month</span></div></section>' +
+    (selected.length
+      ? sect(
+          dateText(c.historyDay, {
+            weekday: 'long',
+            month: 'short',
+            day: 'numeric',
+          }),
+        ) + daySessions(selected)
+      : '') +
+    '</div>'
   );
 }
 function nutrition(s, c) {
@@ -557,7 +636,7 @@ function activeExercise(s, item) {
           ? fmt(displayWeight(prev.kg, s.unit)) + ' × ' + prev.reps
           : '—';
       const inputs = [
-        ['kg', displayWeight(t.kg, s.unit)],
+        ['kg', t.kg == null ? '' : displayWeight(t.kg, s.unit)],
         ['reps', t.reps],
         ['rir', t.rir],
       ]
@@ -579,7 +658,11 @@ function activeExercise(s, item) {
             (key === 'reps' ? 999 : key === 'rir' ? 20 : 100000) +
             '" step="' +
             (key === 'kg' ? 'any' : 1) +
-            '" required data-set="' +
+            '" ' +
+            (key === 'kg'
+              ? 'placeholder="—" title="Enter 0 for bodyweight" '
+              : '') +
+            'required data-set="' +
             key +
             '" ' +
             data +

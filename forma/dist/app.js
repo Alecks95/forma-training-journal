@@ -295,6 +295,23 @@ async function actions(action, b) {
     case 'settings':
       forms.settings();
       return;
+    case 'history-month':
+      ctx.historyMonth = b.dataset.month;
+      ctx.historyDay = null;
+      draw();
+      (
+        main.querySelector(
+          '[aria-label="' + b.getAttribute('aria-label') + '"]:not(:disabled)',
+        ) || main.querySelector('[data-do="history-month"]')
+      ).focus({ preventScroll: true });
+      return;
+    case 'history-day':
+      ctx.historyDay = day;
+      draw();
+      main
+        .querySelector('[data-do="history-day"][aria-pressed="true"]')
+        .focus({ preventScroll: true });
+      return;
     case 'routine-new':
     case 'routine-edit':
       if (dialog) dialog.close();
@@ -344,19 +361,7 @@ async function actions(action, b) {
       forms.weigh(day);
       return;
     case 'weight-delete':
-      confirm(
-        'Delete this weigh-in?',
-        'This removes the entry for ' +
-          day +
-          ' and recalculates its weekly average.',
-        'Delete entry',
-        async () => {
-          await save((s) => {
-            s.weights = s.weights.filter((w) => w.day !== day);
-          });
-          toast('Weigh-in removed');
-        },
-      );
+      forms.removeWeighIn(day);
       return;
     case 'day-prev':
     case 'day-next':
@@ -387,8 +392,8 @@ async function actions(action, b) {
         const sets = activeItem(s, workout, entry).sets;
         if (action === 'set-add') {
           if (sets.length >= 100) throw Error('Maximum 100 sets per exercise.');
-          const { kg, reps, rir } = sets.at(-1);
-          sets.push({ kg, reps, rir, done: false });
+          const { reps, rir } = sets.at(-1);
+          sets.push({ kg: null, reps, rir, done: false });
         } else if (
           sets.length > 1 &&
           sets.at(-1).entryId === setId &&
@@ -428,9 +433,9 @@ async function actions(action, b) {
     case 'workout-options':
       sheet(
         'Workout options',
-        '<div class="form-body">' +
+        '<div class="form-footer">' +
+          btn('discard', 'Discard workout', 'button remove-action') +
           btn('exit-run', 'Minimize workout', 'button') +
-          btn('discard', 'Discard workout', 'remove-action') +
           '</div>',
       );
       return;
@@ -476,20 +481,42 @@ document.addEventListener('change', async (e) => {
     draw();
     return;
   }
-  if (el.dataset.set && state.active) {
-    if (!el.reportValidity()) return;
-    const key = el.dataset.set,
-      { workout, entry, setId } = el.dataset,
-      v = key === 'kg' ? kgWeight(el.value, state.unit) : Number(el.value);
-    try {
-      await save((s) => {
-        findSet(activeItem(s, workout, entry), setId)[key] = v;
-      }, false);
-    } catch (e) {
-      toast(e.message);
-    }
-  }
 });
+async function storeSetInput(event) {
+  const el = event.target;
+  if (!el.dataset.set || !state?.active) return;
+  const { set: key, workout, entry, setId } = el.dataset;
+  const empty = key === 'kg' && el.value === '' && !el.validity.badInput;
+  const uncheck = empty && el.closest('.set-line').classList.contains('done');
+  if (event.type === 'change' && !uncheck) {
+    if (!empty) el.reportValidity();
+    return;
+  }
+  if (event.type === 'input' && uncheck) return;
+  if (!empty && !el.validity.valid) return;
+  const value = empty
+    ? null
+    : key === 'kg'
+      ? kgWeight(el.value, state.unit)
+      : el.valueAsNumber;
+  try {
+    await save((s) => {
+      const set = findSet(activeItem(s, workout, entry), setId);
+      set[key] = value;
+      if (empty && set.done) {
+        set.done = false;
+        if (s.active.restSetId === setId) {
+          s.active.restUntil = 0;
+          s.active.restSetId = null;
+        }
+      }
+    }, uncheck);
+  } catch (e) {
+    toast(e.message);
+  }
+}
+document.addEventListener('input', storeSetInput);
+document.addEventListener('change', storeSetInput);
 window.addEventListener('hashchange', draw);
 bus?.addEventListener('message', async () => {
   if (document.activeElement?.matches('[data-set]')) return;
@@ -519,7 +546,7 @@ nav.innerHTML =
     'settings',
     icon('settings', 19) + '<span>Settings</span>',
     'nav-link settings',
-    'aria-label="Settings and backups"',
+    'aria-label="Settings and backups" title="Settings" aria-haspopup="dialog"',
   );
 async function init() {
   try {

@@ -65,8 +65,7 @@ const dateField = (val, readonly = false) =>
   '" ' +
   (readonly ? 'readonly' : '') +
   '></label>';
-const grid = (html, three = false) =>
-  '<div class="form-grid ' + (three ? 'three' : '') + '">' + html + '</div>';
+const grid = (html) => '<div class="form-grid">' + html + '</div>';
 const unitOptions = (unit) =>
   ['kg', 'lb']
     .map(
@@ -91,6 +90,18 @@ const nutritionFields = (obj) =>
       .map(([k, label]) => field(label, k, obj[k], { max: 1000000 }))
       .join(''),
   );
+const removeButton = (label, data) =>
+  btn(
+    'inline',
+    'Remove',
+    'button remove-action',
+    data + ' aria-label="' + esc(label) + '"',
+  );
+const removeFooter = (label, data) =>
+  '<div class="form-footer">' +
+  removeButton(label, data) +
+  btn('close', 'Cancel', 'button') +
+  '</div>';
 const assertName = (records, name, id) => {
   if (
     records.some(
@@ -99,18 +110,11 @@ const assertName = (records, name, id) => {
   )
     throw Error('That name is already in your library.');
 };
-function targets(x, unit, prefix = '') {
+function targets(x, prefix = '') {
   return (
     grid(
       field('Sets', prefix + 'sets', x.sets, { min: 1, max: 100, step: 1 }) +
-        field('Reps', prefix + 'reps', x.reps, { min: 1, max: 999, step: 1 }) +
-        field(
-          'Weight (' + unit + ')',
-          prefix + 'load',
-          displayWeight(x.kg, unit),
-          { max: 100000 },
-        ),
-      true,
+        field('Reps', prefix + 'reps', x.reps, { min: 1, max: 999, step: 1 }),
     ) +
     grid(
       field('Reps in reserve', prefix + 'rir', x.rir, { max: 20, step: 1 }) +
@@ -121,11 +125,10 @@ function targets(x, unit, prefix = '') {
     )
   );
 }
-function readTargets(fd, unit, p = '') {
+function readTargets(fd, p = '') {
   return {
     sets: num(fd, p + 'sets'),
     reps: num(fd, p + 'reps'),
-    kg: kgWeight(num(fd, p + 'load'), unit),
     rir: num(fd, p + 'rir'),
     rest: num(fd, p + 'rest'),
   };
@@ -149,7 +152,7 @@ export function buildForms(env) {
     const footer = editor.querySelector('.form-footer');
     footer.insertAdjacentHTML(
       'afterbegin',
-      btn('inline', 'Remove ' + kind, 'remove-action', 'data-remove-saved'),
+      removeButton('Remove ' + kind, 'data-remove-saved'),
     );
     editor.querySelector('[data-remove-saved]').onclick = () => {
       let effect = 'Remove this ' + kind + ' from your library?';
@@ -193,20 +196,17 @@ export function buildForms(env) {
     };
   }
   function exercise(id, onSaved) {
-    const unit = state().unit,
-      existing = state().exercises.find((e) => e.id === id),
-      x = existing || { name: '', sets: 3, reps: 8, kg: 0, rir: 2, rest: 90 };
+    const existing = state().exercises.find((e) => e.id === id),
+      x = existing || { name: '', sets: 3, reps: 8, rir: 2, rest: 90 };
     const editor = form(
       existing ? 'Edit exercise' : 'New exercise',
-      field('Exercise name', 'name', x.name, { type: 'text' }) +
-        targets(x, unit) +
-        '<p class="chart-note">These defaults fill new routines. Use 0 weight for bodyweight exercises.</p>',
+      field('Exercise name', 'name', x.name, { type: 'text' }) + targets(x),
       'Save exercise',
       async (fd) => {
         const record = {
           id: existing?.id || uid(),
           name: getText(fd, 'name'),
-          ...readTargets(fd, unit),
+          ...readTargets(fd),
         };
         await save((s) => {
           saveLibraryItem(s.exercises, record, existing);
@@ -218,8 +218,7 @@ export function buildForms(env) {
     addRemoveAction(editor, 'exercise', existing);
   }
   function routine(id) {
-    const unit = state().unit,
-      old = state().routines.find((r) => r.id === id),
+    const old = state().routines.find((r) => r.id === id),
       items = old?.items || [];
     const dlg = form(
       old ? 'Edit routine' : 'New routine',
@@ -236,7 +235,7 @@ export function buildForms(env) {
       async (fd, d) => {
         const items = [...d.querySelectorAll('[data-row]')].map((el) => ({
           exerciseId: el.dataset.exercise,
-          ...readTargets(fd, unit, el.dataset.row + '-'),
+          ...readTargets(fd, el.dataset.row + '-'),
         }));
         if (!old && !items.length)
           throw Error('Add at least one exercise to the routine.');
@@ -276,7 +275,7 @@ export function buildForms(env) {
         '</strong>' +
         smallBtn('inline', 'Remove ' + e.name, 'bin', 'data-remove') +
         '</div>' +
-        targets(values || e, unit, sequence + '-');
+        targets(values || e, sequence + '-');
       block.querySelector('[data-remove]').onclick = () => block.remove();
       list.append(block);
     }
@@ -435,6 +434,32 @@ export function buildForms(env) {
     };
     dlg.querySelector('[name=day]').onchange = hint;
     hint();
+    if (old) {
+      dlg
+        .querySelector('.form-footer')
+        .insertAdjacentHTML(
+          'afterbegin',
+          removeButton('Remove weigh-in', 'data-remove-saved'),
+        );
+      dlg.querySelector('[data-remove-saved]').onclick = () =>
+        removeWeighIn(day, dlg);
+    }
+  }
+  function removeWeighIn(day, editor) {
+    confirm(
+      'Delete this weigh-in?',
+      'This removes the entry for ' +
+        day +
+        ' and recalculates its weekly average.',
+      'Delete entry',
+      async () => {
+        await save((s) => {
+          s.weights = s.weights.filter((w) => w.day !== day);
+        });
+        editor?.close();
+        toast('Weigh-in removed');
+      },
+    );
   }
   async function sessionDetails(id) {
     let w = state().sessions.find((x) => x.id === id);
@@ -490,7 +515,7 @@ export function buildForms(env) {
           )
           .join('') +
         '</div>' +
-        btn('inline', 'Delete workout', 'remove-action', 'data-delete-workout'),
+        removeFooter('Remove workout', 'data-delete-workout'),
     );
     detail.dataset.historyId = id;
     detail.querySelector('[data-delete-workout]').onclick = () =>
@@ -530,7 +555,9 @@ export function buildForms(env) {
               : '<div class="row"><div><strong>Set ' +
                 (index + 1) +
                 '</strong><small class="set-description">' +
-                fmt(displayWeight(set.kg, state().unit)) +
+                (set.kg == null
+                  ? '—'
+                  : fmt(displayWeight(set.kg, state().unit))) +
                 ' ' +
                 state().unit +
                 ' × ' +
@@ -548,12 +575,7 @@ export function buildForms(env) {
           )
           .join('') +
         '</div>' +
-        btn(
-          'inline',
-          'Remove exercise from workout',
-          'remove-action',
-          'data-remove-exercise',
-        ),
+        removeFooter('Remove exercise from workout', 'data-remove-exercise'),
     );
     options.onclick = (event) => {
       const button = event.target.closest(
@@ -644,6 +666,7 @@ export function buildForms(env) {
         '</div><input type="file" accept=".json,application/json" hidden data-file></div>' +
         '<div class="form-error" role="alert"></div></div>',
     );
+    dlg.classList.add('settings-dialog');
     dlg.querySelectorAll('[data-unit]').forEach(
       (b) =>
         (b.onclick = async () => {
@@ -768,6 +791,7 @@ export function buildForms(env) {
     meal,
     goals,
     weigh,
+    removeWeighIn,
     sessionDetails,
     manageExercise,
     settings,

@@ -6,7 +6,7 @@ On iPhone, open the link in Safari, tap **Share**, choose **Add to Home Screen**
 
 ## Training
 
-Create a routine with your exercises, sets, reps, weight, reps in reserve (RIR) and rest times. Start it to get a prefilled set table, or start an empty workout. Checking off a set starts that exercise’s timer. Finish the workout to add it to History and the exercise progression charts.
+Create a routine with your exercises, sets, reps, reps in reserve (RIR) and rest times. Start it to get a prefilled set table, or start an empty workout. Enter the weight for each set during the session, using 0 for bodyweight. Checking off a set starts that exercise’s timer. Finished workouts appear in the exercise progression charts and in the History calendar. Tap a yellow day to see its workouts.
 
 ## Nutrition and weight
 
