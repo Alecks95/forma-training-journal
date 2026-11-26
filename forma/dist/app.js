@@ -518,6 +518,17 @@ async function storeSetInput(event) {
 document.addEventListener('input', storeSetInput);
 document.addEventListener('change', storeSetInput);
 window.addEventListener('hashchange', draw);
+// Safari also sends native pinch gestures on touch-capable devices.
+if (
+  matchMedia('(any-pointer: coarse)').matches ||
+  navigator.maxTouchPoints > 0
+) {
+  for (const type of ['gesturestart', 'gesturechange']) {
+    document.addEventListener(type, (event) => event.preventDefault(), {
+      passive: false,
+    });
+  }
+}
 bus?.addEventListener('message', async () => {
   if (document.activeElement?.matches('[data-set]')) return;
   await refresh();
