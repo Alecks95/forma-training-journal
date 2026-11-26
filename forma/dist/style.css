@@ -1,6 +1,7 @@
 :root {
   color-scheme: dark;
   --bg: #000;
+  --app-height: calc(100dvh - var(--status-bar-height));
   background-color: var(--bg);
   --tab-surface: #111113;
   --panel: #0b0b0c;
@@ -94,7 +95,7 @@ svg {
   z-index: 5;
 }
 .skip:focus {
-  top: calc(env(safe-area-inset-top, 0px) + 10px);
+  top: calc(var(--status-bar-height) + 10px);
   left: calc(env(safe-area-inset-left, 0px) + 10px);
   background: var(--fill);
   color: var(--text);
@@ -102,7 +103,7 @@ svg {
 }
 .app-navigation {
   position: fixed;
-  inset: env(safe-area-inset-top, 0px) auto 0 0;
+  inset: var(--status-bar-height) auto 0 0;
   width: 206px;
   background: #101011;
   border-right: 1px solid #242427;
@@ -184,7 +185,7 @@ main {
   width: calc(100% - 206px);
   max-width: 1240px;
   margin-left: 206px;
-  padding: calc(46px + env(safe-area-inset-top, 0px)) clamp(24px, 5vw, 84px)
+  padding: calc(46px + var(--status-bar-height)) clamp(24px, 5vw, 84px)
     70px;
   min-height: 80vh;
 }
@@ -892,12 +893,13 @@ small,
   font-size: 13px;
 }
 dialog {
+  top: var(--status-bar-height);
   color: var(--text);
   background: #1b1b1d;
   border: 1px solid #39393d;
   border-radius: 14px;
   width: min(500px, calc(100% - 32px));
-  max-height: 87dvh;
+  max-height: calc(var(--app-height) * 0.87);
   padding: 0;
   overscroll-behavior: contain;
 }
@@ -1127,7 +1129,7 @@ dialog::backdrop {
     grid-template-columns: minmax(0, 1fr);
     height: 100vh;
     height: 100dvh;
-    padding-top: env(safe-area-inset-top, 0px);
+    padding-top: var(--status-bar-height);
     overflow: hidden;
   }
   #dialogs {
@@ -1300,16 +1302,14 @@ dialog::backdrop {
     margin: auto 0 0;
     width: 100%;
     max-width: none;
-    max-height: min(91dvh, calc(100dvh - env(safe-area-inset-top) - 8px));
+    max-height: min(calc(var(--app-height) * 0.91), calc(var(--app-height) - 8px));
     border-radius: 15px 15px 0 0;
   }
   .settings-dialog {
     margin: auto;
     width: min(380px, calc(100% - 32px));
     border-radius: 15px;
-    max-height: calc(
-      100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 24px
-    );
+    max-height: calc(var(--app-height) - env(safe-area-inset-bottom) - 24px);
   }
   .settings-dialog .sheet {
     padding: 18px;
