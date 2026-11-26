@@ -14,17 +14,26 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  package:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.publish.outputs.page_url }}
+    outputs:
+      artifact: github-pages-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
           path: forma/dist
+          name: github-pages-${{ github.run_attempt }}
+  deploy:
+    needs: package
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.publish.outputs.page_url }}
+    steps:
       - name: Publish tracker
         id: publish
         uses: actions/deploy-pages@v5
+        with:
+          artifact_name: ${{ needs.package.outputs.artifact }}
