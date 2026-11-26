@@ -32,14 +32,18 @@ final class LaunchTests: XCTestCase {
             if button.exists && button.isHittable { button.tap() }
         }
         let share = safari.buttons["ShareButton"].firstMatch
-        let shareLabel = safari.buttons["Share"].firstMatch
-        if share.waitForExistence(timeout: 4) { share.tap() }
-        else if shareLabel.waitForExistence(timeout: 3) { shareLabel.tap() }
-        else { snapshot("Safari opening",safari); throw Failure.missing("Share") }
+        let ready = XCTNSPredicateExpectation(predicate:NSPredicate(format:"exists == true AND enabled == true AND hittable == true"), object:share)
+        guard XCTWaiter.wait(for:[ready],timeout:55) == .completed else {snapshot("Loading-"+name,safari);throw Failure.missing("enabled Share")}
+        Thread.sleep(forTimeInterval:1)
+        share.tap()
+        Thread.sleep(forTimeInterval:2)
         let add = safari.descendants(matching:.any).matching(NSPredicate(format:"label == %@", "Add to Home Screen")).firstMatch
         for _ in 0..<5 {
             if add.exists && add.isHittable {break}
-            safari.swipeUp()
+            let start=safari.coordinate(withNormalizedOffset:CGVector(dx:0.5,dy:0.85))
+            let end=safari.coordinate(withNormalizedOffset:CGVector(dx:0.5,dy:0.32))
+            start.press(forDuration:0.08,thenDragTo:end)
+            Thread.sleep(forTimeInterval:0.35)
         }
         guard add.exists && add.isHittable else {snapshot("Sharing",safari);throw Failure.missing("Add to Home Screen")}
         add.tap()
