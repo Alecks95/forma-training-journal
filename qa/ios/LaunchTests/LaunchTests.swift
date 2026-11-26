@@ -62,19 +62,38 @@ final class LaunchTests: XCTestCase {
     }
     func testHomeLaunch() throws {
         continueAfterFailure = false
-        for (variant,name) in [("upgrade","Form Update"),("snapshot","Form Snapshot")] {
-            let icon = try install(variant,name:name)
-            let series = variant == "upgrade" ? ["first","warm","cold","receive","updated","again"] : ["first","warm","cold","again"]
-            for kind in series {
-                let label=variant+"-"+kind
-                if kind == "receive" { try record("upgrade", variant) }
-                if kind != "first" && kind != "warm" {try record("terminate",label)}
+        let icon = try install("upgrade", name: "Form Update")
+        for mode in ["standard", "reduced"] {
+            if mode == "reduced" {
+                let settings = XCUIApplication(bundleIdentifier: "com.apple.Preferences")
+                settings.launch()
+                let access = settings.cells.containing(.staticText, identifier: "Accessibility").firstMatch
+                for _ in 0..<6 {
+                    if access.exists && access.isHittable {break}
+                    settings.swipeUp()
+                }
+                guard access.exists && access.isHittable else {snapshot("Settings",settings);throw Failure.missing("Accessibility")}
+                access.tap()
+                let motion = settings.staticTexts["Motion"].firstMatch
+                guard motion.waitForExistence(timeout:8) else {snapshot("Accessibility",settings);throw Failure.missing("Motion")}
+                motion.tap()
+                let toggle = settings.switches.containing(.staticText, identifier:"Reduce Motion").firstMatch
+                let named = settings.switches["Reduce Motion"].firstMatch
+                let item = named.exists ? named : (toggle.exists ? toggle : settings.switches.firstMatch)
+                guard item.waitForExistence(timeout:8) else {snapshot("Motion",settings);throw Failure.missing("Reduce Motion")}
+                if (item.value as? String) != "1" {item.tap()}
+                XCTAssertEqual(item.value as? String,"1")
+                snapshot("Reduce-Motion-enabled",settings)
+                XCUIDevice.shared.press(.home)
+                for _ in 0..<4 {if icon.exists && icon.isHittable {break};spring.swipeLeft()}
+            }
+            for kind in ["first","warm","cold","again"] {
+                let label="upgrade-"+mode+"-"+kind
+                if kind != "warm" {try record("terminate",label)}
                 try record("start", label)
                 icon.tap()
-                Thread.sleep(forTimeInterval:kind == "receive" ? 12 : 6)
+                Thread.sleep(forTimeInterval:4)
                 try record("stop", label)
-                let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
-                attachment.name = "Opened-"+label;attachment.lifetime = .keepAlways;add(attachment)
                 XCUIDevice.shared.press(.home)
             }
         }

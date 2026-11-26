@@ -52,11 +52,12 @@ class Handler(SimpleHTTPRequestHandler):
             body = body.replace(b"'v16'",b"'v17'")
         elif name == 'index.html' and variant != 'current':
             html = body.decode().replace('content="Form"','content="'+variants[variant]+'"')
+            html = html.replace('content="black-translucent"', 'content="black"')
             if variant == 'theme':
                 html = html.replace(' media="(display-mode: browser)"','')
             if variant == 'snapshot' or (variant == 'upgrade' and Handler.upgraded):
                 html = re.sub(r' *<link rel="apple-touch-startup-image"[^>]*>\n','',html)
-            probe = """<script>addEventListener('load',()=>setTimeout(()=>fetch('/geometry/VARIANT',{method:'POST',body:JSON.stringify({standalone:navigator.standalone,height:innerHeight,screen:screen.height,inset:getComputedStyle(document.documentElement,'::before').height,launchImages:document.querySelectorAll('[rel=apple-touch-startup-image]').length,theme:document.querySelector('[name=apple-mobile-web-app-status-bar-style]').content})}),650))</script>""".replace("VARIANT",variant)
+            probe = """<script>addEventListener('load',()=>setTimeout(()=>fetch('/geometry/VARIANT',{method:'POST',body:JSON.stringify({reduced:matchMedia('(prefers-reduced-motion: reduce)').matches,standalone:navigator.standalone,height:innerHeight,screen:screen.height,inset:getComputedStyle(document.documentElement,'::before').height,launchImages:document.querySelectorAll('[rel=apple-touch-startup-image]').length,theme:document.querySelector('[name=apple-mobile-web-app-status-bar-style]').content})}),650))</script>""".replace("VARIANT",variant)
             html = html.replace('</body>',probe+'</body>')
             if variant == 'plain':
                 html = html[:html.index('    <link\n      id="app-styles"')] + '</head><body style="background:black"><p style="padding:90px 16px;color:white">Workout</p></body></html>'
