@@ -54,7 +54,7 @@ function draw() {
     window.scrollTo({ top: 0, behavior: 'instant' });
   }
   document.title =
-    (p === 'run' ? 'Workout' : p[0].toUpperCase() + p.slice(1)) + ' · Forma';
+    (p === 'run' ? 'Workout' : p[0].toUpperCase() + p.slice(1)) + ' · Form';
   tick();
 }
 async function refresh() {
@@ -425,7 +425,7 @@ async function actions(action, b) {
         'Workout options',
         '<div class="form-body">' +
           btn('exit-run', 'Minimize workout', 'button') +
-          btn('discard', 'Discard workout', 'text-btn danger') +
+          btn('discard', 'Discard workout', 'remove-action') +
           '</div>',
       );
       return;
@@ -522,7 +522,7 @@ async function init() {
     await refresh();
   } catch {
     main.innerHTML =
-      '<section class="card"><h2>Local storage unavailable</h2><p>Allow site storage in this browser and reopen Forma to save your journal.</p></section>';
+      '<section class="card"><h2>Local storage unavailable</h2><p>Allow site storage in this browser and reopen Form to save your journal.</p></section>';
     return;
   }
   draw();

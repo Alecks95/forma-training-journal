@@ -39,14 +39,24 @@ const options = (list, selected) =>
         '</option>',
     )
     .join('');
-const selectField = (label, key, opts) =>
-  '<label class="field"><span>' +
-  label +
-  '</span><select name="' +
-  key +
-  '" required>' +
-  opts +
-  '</select></label>';
+function selectField(label, key, opts, action = '') {
+  const id = 'field-' + uid();
+  return (
+    '<div class="field"><div class="field-caption"><label for="' +
+    id +
+    '">' +
+    esc(label) +
+    '</label>' +
+    action +
+    '</div><select id="' +
+    id +
+    '" name="' +
+    key +
+    '" required>' +
+    opts +
+    '</select></div>'
+  );
+}
 const dateField = (val, readonly = false) =>
   '<label class="field"><span>Date</span><input name="day" type="date" required min="1900-01-01" max="' +
   localDay() +
@@ -138,8 +148,8 @@ export function buildForms(env) {
     }[kind];
     const footer = editor.querySelector('.form-footer');
     footer.insertAdjacentHTML(
-      'beforebegin',
-      btn('inline', 'Remove ' + kind, 'text-btn danger', 'data-remove-saved'),
+      'afterbegin',
+      btn('inline', 'Remove ' + kind, 'remove-action', 'data-remove-saved'),
     );
     editor.querySelector('[data-remove-saved]').onclick = () => {
       let effect = 'Remove this ' + kind + ' from your library?';
@@ -216,8 +226,8 @@ export function buildForms(env) {
       field('Routine name', 'name', old?.name || '', { type: 'text' }) +
         '<div class="row-between"><h3>Exercises</h3>' +
         btn('inline', 'New exercise', 'text-btn', 'data-new-exercise') +
-        '</div><div class="stack" data-items></div><div class="button-row">' +
-        '<select class="select" style="flex:1" aria-label="Exercise to add" data-pick>' +
+        '</div><div class="stack" data-items></div><div class="exercise-picker">' +
+        '<select class="select" aria-label="Exercise to add" data-pick>' +
         options(state().exercises, null) +
         '</select>' +
         btn('inline', icon('plus', 16) + 'Add', 'button', 'data-add') +
@@ -322,13 +332,17 @@ export function buildForms(env) {
     const first = id || state().foods[0].id;
     const dlg = form(
       'Log food',
-      selectField('Saved food', 'foodId', options(state().foods, first)) +
+      selectField(
+        'Saved food',
+        'foodId',
+        options(state().foods, first),
         btn(
           'inline',
           icon('plus', 15) + 'Create food',
           'text-btn',
           'data-new-food',
-        ) +
+        ),
+      ) +
         '<p data-portion></p>' +
         grid(
           field('Servings', 'servings', 1, {
@@ -476,12 +490,7 @@ export function buildForms(env) {
           )
           .join('') +
         '</div>' +
-        btn(
-          'inline',
-          'Delete workout',
-          'text-btn danger',
-          'data-delete-workout',
-        ),
+        btn('inline', 'Delete workout', 'remove-action', 'data-delete-workout'),
     );
     detail.dataset.historyId = id;
     detail.querySelector('[data-delete-workout]').onclick = () =>
@@ -542,7 +551,7 @@ export function buildForms(env) {
         btn(
           'inline',
           'Remove exercise from workout',
-          'text-btn danger',
+          'remove-action',
           'data-remove-exercise',
         ),
     );
@@ -633,19 +642,8 @@ export function buildForms(env) {
         btn('inline', 'Export backup', 'button', 'data-export') +
         btn('inline', 'Restore backup', 'button', 'data-restore') +
         '</div><input type="file" accept=".json,application/json" hidden data-file></div>' +
-        '<div class="settings-group"><h3>Use on iPhone</h3><p>In Safari’s Share menu, choose Add to Home Screen. Open Forma from that icon to keep using the same journal.</p><span class="on-device"><i></i><span id="offline-status">Checking offline availability…</span></span></div><div class="form-error" role="alert"></div></div>',
+        '<div class="form-error" role="alert"></div></div>',
     );
-    const offline = dlg.querySelector('#offline-status');
-    if ('serviceWorker' in navigator)
-      navigator.serviceWorker
-        .getRegistration()
-        .then((reg) => {
-          offline.textContent = reg?.active
-            ? 'Available offline on this device'
-            : 'Keep Forma open online to prepare offline access.';
-        })
-        .catch(() => (offline.textContent = 'Offline setup unavailable.'));
-    else offline.textContent = 'Offline setup unavailable in this browser.';
     dlg.querySelectorAll('[data-unit]').forEach(
       (b) =>
         (b.onclick = async () => {
@@ -667,13 +665,13 @@ export function buildForms(env) {
       try {
         const fresh = await env.refresh();
         const blob = new Blob(
-          [JSON.stringify({ app: 'Forma', journal: fresh }, null, 2)],
+          [JSON.stringify({ app: 'Form', journal: fresh }, null, 2)],
           { type: 'application/json' },
         );
         const a = document.createElement('a');
         const url = URL.createObjectURL(blob);
         a.href = url;
-        a.download = 'forma-backup-' + localDay() + '.json';
+        a.download = 'form-backup-' + localDay() + '.json';
         document.body.append(a);
         a.click();
         a.remove();
@@ -690,8 +688,11 @@ export function buildForms(env) {
       if (!file) return;
       try {
         const content = JSON.parse(await file.text());
-        if (content.app !== 'Forma' || !validState(content.journal))
-          throw Error('Choose a valid Forma backup.');
+        if (
+          !['Form', 'Forma'].includes(content.app) ||
+          !validState(content.journal)
+        )
+          throw Error('Choose a valid Form backup.');
         confirm(
           'Restore this backup?',
           'This replaces this device’s journal with ' +
@@ -711,7 +712,7 @@ export function buildForms(env) {
         );
       } catch {
         dlg.querySelector('.form-error').textContent =
-          'This file is not a valid Forma backup.';
+          'Choose a valid Form backup file.';
       } finally {
         input.value = '';
       }
@@ -721,13 +722,17 @@ export function buildForms(env) {
     const sessionId = state().active.id;
     const dlg = form(
       'Add exercise',
-      selectField('Exercise', 'exerciseId', options(state().exercises, null)) +
+      selectField(
+        'Exercise',
+        'exerciseId',
+        options(state().exercises, null),
         btn(
           'inline',
           icon('plus', 15) + 'New exercise',
           'text-btn',
           'data-new',
         ),
+      ),
       'Add to workout',
       async (fd) => {
         await save((s) => {

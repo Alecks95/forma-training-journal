@@ -1,4 +1,4 @@
-name: Publish Forma
+name: Publish Form
 on:
   push:
     branches: [main]

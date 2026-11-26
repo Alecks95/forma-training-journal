@@ -1,7 +1,7 @@
 {
   "id": "./",
-  "name": "Forma · Training Journal",
-  "short_name": "Forma",
+  "name": "Form",
+  "short_name": "Form",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

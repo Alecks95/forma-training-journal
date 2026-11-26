@@ -1,8 +1,8 @@
-# Forma
+# Form
 
 [Open the tracker](https://alecks95.github.io/forma-training-journal/).
 
-On iPhone, open the link in Safari, tap **Share**, choose **Add to Home Screen**, then open Forma from its icon. Open it online once to prepare offline access. Friends can use the same link. Each installation has its own journal.
+On iPhone, open the link in Safari, tap **Share**, choose **Add to Home Screen**, then open Form from its icon. Open it online once to prepare offline access. Friends can use the same link. Each installation has its own journal.
 
 ## Training
 
@@ -14,7 +14,7 @@ Save foods by portion and log any number of servings. Change calorie and macro t
 
 ## Backups
 
-Forma stores entries in IndexedDB on the device. Use **Settings → Export backup** before clearing site data or changing phones. Restore the file on the new device.
+Form stores entries in IndexedDB on the device. Use **Settings → Export backup** before clearing site data or changing phones. Restore the file on the new device.
 
 ## Running locally
 
