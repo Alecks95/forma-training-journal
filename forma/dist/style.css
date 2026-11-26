@@ -94,10 +94,10 @@ svg {
   z-index: 5;
 }
 .skip:focus {
-  top: 10px;
-  left: 10px;
-  background: #fff;
-  color: #000;
+  top: calc(env(safe-area-inset-top, 0px) + 10px);
+  left: calc(env(safe-area-inset-left, 0px) + 10px);
+  background: var(--fill);
+  color: var(--text);
   padding: 8px;
 }
 .app-navigation {

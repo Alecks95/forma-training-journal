@@ -8,6 +8,8 @@
     />
     <meta name="color-scheme" content="dark" />
     <meta name="theme-color" content="#000000" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <style>
       html,
       body {
@@ -16,17 +18,16 @@
         color: #fafafa;
         color-scheme: dark;
       }
-      /* Paint the black canvas immediately, then show the styled app. */
-      html:has(#app-styles[media="print"]) body {
+      body {
+        min-height: 100vh;
+        min-height: 100dvh;
+      }
+      /* Keep the canvas behind the iOS status icons painted while UI styles load. */
+      html:has(#app-styles[media="print"]) body > * {
         visibility: hidden;
       }
     </style>
-    <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Form" />
-    <meta
-      name="apple-mobile-web-app-status-bar-style"
-      content="black"
-    />
     <meta
       name="description"
       content="Your personal training, nutrition and body weight journal."
@@ -93,7 +94,7 @@
     />
     <noscript>
       <link rel="stylesheet" href="./style.css" />
-      <style>body { visibility: visible !important; }</style>
+      <style>body > * { visibility: visible !important; }</style>
     </noscript>
   </head>
   <body>
