@@ -1,6 +1,6 @@
 const scope = new URL(self.registration.scope);
 const prefix = 'forma-assets-' + scope.pathname + '-';
-const cacheName = prefix + 'v11';
+const cacheName = prefix + 'v12';
 const assets = [
   './',
   './index.html',
@@ -16,6 +16,7 @@ const assets = [
   './assets/icon-512.png',
 ];
 const urls = new Set(assets.map((p) => new URL(p, scope).href));
+const startupDirectory = new URL('./assets/startup/', scope).href;
 self.addEventListener('install', (e) =>
   e.waitUntil(
     (async () => {
@@ -49,12 +50,19 @@ self.addEventListener('fetch', (e) => {
   ) {
     url.search = '';
   }
-  if (!urls.has(url.href)) return;
+  const isStartupImage =
+    url.href.startsWith(startupDirectory) && url.pathname.endsWith('.png');
+  if (!urls.has(url.href) && !isStartupImage) return;
   e.respondWith(
     (async () => {
       const cache = await caches.open(cacheName);
       const hit = await cache.match(url.href);
-      return hit || fetch(e.request);
+      if (hit) return hit;
+      const response = await fetch(e.request);
+      if (isStartupImage && response.ok) {
+        await cache.put(url.href, response.clone()).catch(() => {});
+      }
+      return response;
     })(),
   );
 });
