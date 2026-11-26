@@ -60,20 +60,29 @@ final class LaunchTests: XCTestCase {
         guard icon.exists && icon.isHittable else {snapshot("Home-"+name,spring);throw Failure.missing(name)}
         return icon
     }
-    func testHomeLaunch() throws {
+    func compare(_ channel:String, _ name:String) throws {
         continueAfterFailure = false
-        let icon = try install("upgrade", name: "Form Update")
-        for (index,mode) in ["control","scheme","blocking","bare","stream","scheme","bare","blocking","stream","control"].enumerated() {
-            let label="upgrade-"+String(index)
-            try record("mode","upgrade-"+mode)
-            try record("terminate",label)
-            try record("start",label)
-            icon.tap()
-            Thread.sleep(forTimeInterval:mode.hasSuffix("delay") ? 10 : 5)
-            try record("stop",label)
-            XCUIDevice.shared.press(.home)
+        let icon = try install(channel, name:name)
+        let modes = channel == "today" ? ["today","classic"] : [channel,"today","classic"]
+        for (i, mode) in modes.enumerated() {
+            if i != 0 {try record("change",channel+"-"+mode)}
+            for stage in ["receive","cold1","warm","cold2"] {
+                let label=channel+"-"+mode+"-"+stage
+                if stage != "warm" {try record("terminate",label)}
+                try record("start",label)
+                icon.tap()
+                Thread.sleep(forTimeInterval:stage == "receive" ? 9 : 4)
+                let attachment = XCTAttachment(screenshot:XCUIScreen.main.screenshot())
+                attachment.name = label; attachment.lifetime = .keepAlways; add(attachment)
+                try record("stop",label)
+                XCUIDevice.shared.press(.home)
+            }
         }
     }
+
+    func testFirstRelease() throws {try compare("first", "Form First")}
+    func testOpaqueRelease() throws {try compare("middle", "Form Middle")}
+    func testCurrentRelease() throws {try compare("today", "Form Today")}
     enum Failure: Error {case missing(String)}
 }
 
