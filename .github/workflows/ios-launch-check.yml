@@ -1,0 +1,52 @@
+name: iOS Home Screen launch check
+on:
+  push:
+    branches: [codex/ios18-launch-check]
+permissions:
+  contents: read
+jobs:
+  capture:
+    runs-on: macos-15
+    timeout-minutes: 22
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Prepare the iOS 18.6 simulator
+        run: |
+          sudo xcode-select -s /Applications/Xcode_16.4.app
+          xcrun simctl list runtimes
+          SIM=$(xcrun simctl create FormLaunch com.apple.CoreSimulator.SimDeviceType.iPhone-11-Pro com.apple.CoreSimulator.SimRuntime.iOS-18-6)
+          echo "SIM=$SIM" >> "$GITHUB_ENV"
+          xcrun simctl boot "$SIM"
+          xcrun simctl bootstatus "$SIM" -b
+          xcrun simctl ui "$SIM" appearance dark
+          mkdir -p "$RUNNER_TEMP/form-launch"
+      - name: Build the UI test
+        working-directory: qa/ios
+        run: |
+          if ! command -v xcodegen >/dev/null; then HOMEBREW_NO_AUTO_UPDATE=1 brew install xcodegen; fi
+          xcodegen generate
+          xcodebuild -quiet -scheme FormLaunch -destination "id=$SIM" -derivedDataPath "$RUNNER_TEMP/form-dd" -parallel-testing-enabled NO build-for-testing
+      - name: Install and open the web apps from SpringBoard
+        working-directory: qa/ios
+        run: |
+          set -o pipefail
+          python3 serve.py > "$RUNNER_TEMP/form-launch/server.log" 2>&1 &
+          server=$!
+          trap 'kill "$server" 2>/dev/null || true' EXIT
+          for n in {1..15}; do curl -fsS -o /dev/null http://127.0.0.1:8765/current/ && break; sleep 1; done
+          xcodebuild -scheme FormLaunch -destination "id=$SIM" -derivedDataPath "$RUNNER_TEMP/form-dd" -parallel-testing-enabled NO -resultBundlePath "$RUNNER_TEMP/form-results.xcresult" test-without-building | tee "$RUNNER_TEMP/form-launch/test.log"
+      - if: always()
+        name: Collect simulator evidence
+        run: |
+          mkdir -p "$RUNNER_TEMP/form-launch"
+          if [ -n "$SIM" ]; then xcrun simctl io "$SIM" screenshot "$RUNNER_TEMP/form-launch/last.png" || true; fi
+          if [ -d "$RUNNER_TEMP/form-results.xcresult" ]; then xcrun xcresulttool export attachments --path "$RUNNER_TEMP/form-results.xcresult" --output-path "$RUNNER_TEMP/form-launch/screens" || true; fi
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulator-evidence-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/form-launch/
+          retention-days: 3
+

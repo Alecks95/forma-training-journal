@@ -1,0 +1,38 @@
+name: FormLaunch
+options:
+  bundleIdPrefix: com.form.launchtest
+  deploymentTarget:
+    iOS: "18.0"
+settings:
+  base:
+    CODE_SIGNING_ALLOWED: NO
+    GENERATE_INFOPLIST_FILE: YES
+    SWIFT_VERSION: "5.0"
+targets:
+  TestHost:
+    type: application
+    platform: iOS
+    sources: [TestHost]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.form.launchtest.host
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+  LaunchTests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [LaunchTests]
+    dependencies:
+      - target: TestHost
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.form.launchtest.uitests
+        TEST_TARGET_NAME: TestHost
+schemes:
+  FormLaunch:
+    build:
+      targets:
+        TestHost: all
+        LaunchTests: [test]
+    test:
+      targets: [LaunchTests]
+
