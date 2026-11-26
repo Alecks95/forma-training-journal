@@ -1073,9 +1073,6 @@ dialog::backdrop {
 .segment.active {
   background: #35353a;
 }
-.loading {
-  color: var(--muted);
-}
 #toast {
   position: fixed;
   bottom: 20px;

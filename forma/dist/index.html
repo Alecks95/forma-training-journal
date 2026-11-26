@@ -9,7 +9,7 @@
     <meta name="color-scheme" content="dark" />
     <meta name="theme-color" content="#000000" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
     <style>
       html,
       body {
@@ -22,7 +22,7 @@
         min-height: 100vh;
         min-height: 100dvh;
       }
-      /* Keep the canvas behind the iOS status icons painted while UI styles load. */
+      /* Paint the page black before the first styled frame. */
       html:has(#app-styles[media="print"]) body > * {
         visibility: hidden;
       }
@@ -106,7 +106,7 @@
       <nav id="nav" aria-label="Main navigation"></nav>
     </div>
     <main id="main" tabindex="-1">
-      <p class="loading">Opening your journal…</p>
+      <noscript>Enable JavaScript to open your journal.</noscript>
     </main>
     <div id="dialogs"></div>
     <div id="toast" role="status" aria-live="polite"></div>
