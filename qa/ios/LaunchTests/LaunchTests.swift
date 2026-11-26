@@ -62,7 +62,7 @@ final class LaunchTests: XCTestCase {
     }
     func testHomeLaunch() throws {
         continueAfterFailure = false
-        for (variant,name) in [("snapshot","Form Snapshot"),("legacy","Form Existing")] {
+        for (variant,name) in [("current","Form"),("plain","Form Plain"),("theme","Form Theme"),("snapshot","Form Snapshot"),("legacy","Form Existing")] {
             let icon = try install(variant,name:name)
             for label in [variant,variant+"-warm"] {
                 if variant == "legacy" && label.hasSuffix("-warm") {
@@ -72,7 +72,7 @@ final class LaunchTests: XCTestCase {
                 }
                 try record("start", label)
                 icon.tap()
-                Thread.sleep(forTimeInterval:1.5)
+                Thread.sleep(forTimeInterval:5)
                 try record("stop", label)
                 let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
                 attachment.name = "Opened-"+label;attachment.lifetime = .keepAlways;add(attachment)

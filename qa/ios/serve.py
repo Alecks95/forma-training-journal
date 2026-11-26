@@ -21,18 +21,9 @@ class Handler(SimpleHTTPRequestHandler):
         elif action == 'geometry':
             message = self.rfile.read(int(self.headers.get('Content-Length',0)))
             print('GEOMETRY',name,message.decode(),flush=True)
-        elif action == 'start':
-            if Handler.recorder:
-                self.send_error(409)
-                return
-            logfile = open(out / (name+'.log'), 'wb')
-            Handler.recorder = Popen(['xcrun','simctl','io',sim,'recordVideo','--codec=h264','--mask=ignored',str(out / (name+'.mp4'))], stdout=logfile, stderr=STDOUT)
-            time.sleep(1)
-        elif action == 'stop':
-            if Handler.recorder:
-                Handler.recorder.send_signal(signal.SIGINT)
-                Handler.recorder.wait(timeout=15)
-                Handler.recorder=None
+        elif action in ('start','stop'):
+            # XCTest captures the system compositor, including SpringBoard.
+            print('LAUNCH',action,name,time.time(),flush=True)
         else:
             self.send_error(404)
             return

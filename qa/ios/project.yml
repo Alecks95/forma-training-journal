@@ -34,5 +34,8 @@ schemes:
         TestHost: all
         LaunchTests: [test]
     test:
+      captureScreenshotsAutomatically: true
+      deleteScreenshotsWhenEachTestSucceeds: false
+      preferredScreenCaptureFormat: screenRecording
       targets: [LaunchTests]
 
