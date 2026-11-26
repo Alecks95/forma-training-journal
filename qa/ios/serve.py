@@ -10,15 +10,15 @@ sim = os.environ['SIM']
 variants = {'upgrade': 'Form Update', 'snapshot': 'Form Snapshot'}
 class Handler(SimpleHTTPRequestHandler):
     recorder = None
-    upgraded = False
+    mode = 'install'
     def do_POST(self):
         action, _, name = self.path.strip('/').partition('/')
         variant=name.split('-')[0]
         if variant not in variants:
             self.send_error(404)
             return
-        if action == 'upgrade' and name == 'upgrade':
-            Handler.upgraded = True
+        if action == 'mode':
+            Handler.mode = name.partition('-')[2]
         elif action == 'terminate':
             result = run(['xcrun','simctl','terminate',sim,'com.apple.webapp'],capture_output=True,text=True)
             print('TERMINATE',name,result.returncode,result.stderr,flush=True)
@@ -48,15 +48,24 @@ class Handler(SimpleHTTPRequestHandler):
             manifest = json.loads(body)
             manifest.update(name=variants[variant],short_name=variants[variant])
             body = json.dumps(manifest).encode()
-        elif name == 'sw.js' and variant == 'upgrade' and Handler.upgraded:
-            body = body.replace(b"'v16'",b"'v17'")
+        elif name == 'sw.js':
+            self.send_error(404)
+            return
         elif name == 'index.html' and variant != 'current':
             html = body.decode().replace('content="Form"','content="'+variants[variant]+'"')
-            html = html.replace('content="black-translucent"', 'content="black"')
-            if variant == 'theme':
+            mode = Handler.mode
+            if mode == 'install':
+                html = html.replace('content="black-translucent"', 'content="black"')
+            if mode.startswith('theme'):
                 html = html.replace(' media="(display-mode: browser)"','')
-            if variant == 'snapshot' or (variant == 'upgrade' and Handler.upgraded):
-                html = re.sub(r' *<link rel="apple-touch-startup-image"[^>]*>\n','',html)
+            if mode.endswith('delay'):
+                print('HOLD', mode, time.time(), flush=True)
+                time.sleep(6)
+            if mode != 'install':
+                # A new, distinct marker proves when each response first reaches the screen.
+                color = {'control':'red','control-delay':'blue','theme':'lime','theme-delay':'magenta'}[mode]
+                html = html.replace('</body>', '<i style="position:fixed;left:44%;top:65%;width:12%;height:20px;z-index:99999;background:'+color+'"></i></body>')
+            print('RESPONSE', mode, time.time(), flush=True)
             probe = """<script>addEventListener('load',()=>setTimeout(()=>fetch('/geometry/VARIANT',{method:'POST',body:JSON.stringify({reduced:matchMedia('(prefers-reduced-motion: reduce)').matches,standalone:navigator.standalone,height:innerHeight,screen:screen.height,inset:getComputedStyle(document.documentElement,'::before').height,launchImages:document.querySelectorAll('[rel=apple-touch-startup-image]').length,theme:document.querySelector('[name=apple-mobile-web-app-status-bar-style]').content})}),650))</script>""".replace("VARIANT",variant)
             html = html.replace('</body>',probe+'</body>')
             if variant == 'plain':
