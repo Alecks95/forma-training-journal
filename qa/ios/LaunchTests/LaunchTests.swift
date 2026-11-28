@@ -71,13 +71,20 @@ final class LaunchTests: XCTestCase {
         return icon
     }
     func showOnHome(_ icon: XCUIElement) throws {
-        if XCUIApplication(bundleIdentifier:"com.apple.webapp").state == .runningForeground || !icon.isHittable {
+        if XCUIApplication(bundleIdentifier:"com.apple.webapp").state == .runningForeground {
             XCUIDevice.shared.press(.home)
+            Thread.sleep(forTimeInterval:2)
         }
-        for _ in 0..<4 {
-            if icon.exists && icon.isHittable {return}
-            spring.swipeLeft()
+        let available = NSPredicate(format:"exists == true AND hittable == true")
+        for attempt in 0..<6 {
+            let ready = XCTNSPredicateExpectation(predicate:available,object:icon)
+            if XCTWaiter.wait(for:[ready],timeout:3) == .completed {return}
+            if attempt == 0 {XCUIDevice.shared.press(.home)}
+            else if attempt <= 2 {spring.swipeRight()}
+            else {spring.swipeLeft()}
+            Thread.sleep(forTimeInterval:1)
         }
+        snapshot("icon-page",spring)
         throw Failure.missing("installed Home icon")
     }
     func photograph(_ icon: XCUIElement, _ label: String) throws {
@@ -93,14 +100,13 @@ final class LaunchTests: XCTestCase {
         icon.tap()
         Thread.sleep(forTimeInterval:9)
         try record("stop",label)
-        try showOnHome(icon)
     }
     func testRetainedBookmark() throws {
         continueAfterFailure=false
-        let existing=try install("middle",name:"Form")
         try record("change","middle-whiterelease")
-        try launch(existing,"middle-previous")
+        let existing=try install("middle",name:"Form")
         try photograph(existing,"retained-before")
+        try launch(existing,"middle-previous")
         try record("change","middle-whiteicon")
         try launch(existing,"middle-receive")
         try launch(existing,"middle-updated")

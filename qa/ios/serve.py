@@ -3,7 +3,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from subprocess import check_output, run
 from urllib.parse import urlsplit
-import base64, json, mimetypes, os, re, time, signal, subprocess
+import base64, json, mimetypes, os, re, time, signal, subprocess, plistlib, shutil
 
 # All shipped app files, including the offline worker, come from these releases.
 revisions = {'first': 'dea359f', 'middle': '739a262', 'today': '9a705ae', 'classic': '9a705ae'}
@@ -18,6 +18,19 @@ sim = os.environ['SIM']
 capture_dir = Path(os.environ['RUNNER_TEMP'])/'form-launch'/'trials'
 capture_dir.mkdir(exist_ok=True)
 captures = {}
+
+def installed_tiles(label):
+    device = Path.home()/'Library/Developer/CoreSimulator/Devices'/sim/'data'
+    for clip in (device/'Library/WebClips').glob('*.webclip'):
+        info = clip/'Info.plist'
+        if not info.is_file(): continue
+        meta = plistlib.loads(info.read_bytes())
+        url = meta.get('URL','')
+        if not url.startswith('http://127.0.0.1:8765/'): continue
+        name = urlsplit(url).path.strip('/')
+        print('WEBCLIP',label,name,[p.name for p in clip.glob('*.png')],flush=True)
+        for png in clip.glob('*.png'):
+            shutil.copyfile(png, capture_dir/(label+'-'+name+'-'+png.name))
 
 def begin_capture(label):
     output = open(capture_dir/(label+'.log'), 'wb')
@@ -80,6 +93,7 @@ class Handler(BaseHTTPRequestHandler):
             begin_capture(label)
         elif action == 'stop':
             end_capture(label)
+            installed_tiles(label)
         elif action == 'seen':
             print('GEOMETRY',variant,self.rfile.read(int(self.headers.get('Content-Length',0))).decode(),flush=True)
         elif action not in ('start','stop'):
