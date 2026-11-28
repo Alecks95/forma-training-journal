@@ -115,23 +115,32 @@ function routineRow(r, s, expanded) {
     );
   else if (s.active?.routineId === r.id)
     start = btn('resume', 'Resume workout', 'start-routine');
+  const panelId = 'routine-panel-' + esc(r.id);
   return (
-    '<details class="routine" name="workout-routines" data-routine="' +
-    esc(r.id) +
+    '<div class="routine">' +
+    btn(
+      'routine-toggle',
+      '<strong>' + esc(r.name) + '</strong>' + icon('chevron', 16),
+      'routine-toggle',
+      idAttr(r.id) +
+        ' aria-expanded="' +
+        expanded +
+        '" aria-controls="' +
+        panelId +
+        '"',
+    ) +
+    '<div class="routine-panel" id="' +
+    panelId +
     '"' +
-    (expanded ? ' open' : '') +
-    '><summary><strong>' +
-    esc(r.name) +
-    '</strong>' +
-    icon('chevron', 16) +
-    '</summary><div class="routine-detail">' +
+    (expanded ? '' : ' inert') +
+    '><div class="routine-detail">' +
     (items
       ? '<ul class="routine-lines">' + items + '</ul>'
       : '<p class="subhead">No exercises in this routine.</p>') +
     '<div class="button-row">' +
     start +
     edit +
-    '</div></div></details>'
+    '</div></div></div></div>'
   );
 }
 function workoutScreen(s, c) {

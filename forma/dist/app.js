@@ -18,17 +18,6 @@ let state,
 const ctx = { foodDay: localDay(), exercise: '', routine: '', graphSet: null };
 const main = document.querySelector('main'),
   nav = document.querySelector('nav');
-main.addEventListener(
-  'toggle',
-  ({ target }) => {
-    if (target.matches('details[data-routine]')) {
-      ctx.routine =
-        main.querySelector('details[data-routine][open]')?.dataset.routine ||
-        '';
-    }
-  },
-  true,
-);
 const bus =
   'BroadcastChannel' in window
     ? new BroadcastChannel('forma-journal-changes')
@@ -325,6 +314,15 @@ async function actions(action, b) {
       main
         .querySelector('[data-do="history-day"][aria-pressed="true"]')
         .focus({ preventScroll: true });
+      return;
+    case 'routine-toggle':
+      ctx.routine = ctx.routine === id ? '' : id;
+      for (const toggle of main.querySelectorAll('.routine-toggle')) {
+        const expanded = toggle.dataset.id === ctx.routine;
+        toggle.setAttribute('aria-expanded', String(expanded));
+        document.getElementById(toggle.getAttribute('aria-controls')).inert =
+          !expanded;
+      }
       return;
     case 'routine-new':
     case 'routine-edit':

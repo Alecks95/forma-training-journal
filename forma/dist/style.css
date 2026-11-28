@@ -342,39 +342,51 @@ small,
 .routine {
   border-top: 1px solid var(--line);
 }
-.routine summary {
+.routine-toggle {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  width: 100%;
   min-height: 52px;
   padding: 10px 4px;
-  cursor: pointer;
-  list-style: none;
-  outline: none;
+  text-align: start;
 }
-.routine summary::-webkit-details-marker {
-  display: none;
-}
-.routine summary:focus-visible strong {
-  text-decoration: underline;
-  text-underline-offset: 0.2em;
-}
-.routine summary strong,
+.routine-toggle strong,
 .routine-lines strong {
   overflow-wrap: anywhere;
 }
-.routine summary svg {
+.routine-toggle svg {
   flex: none;
   color: var(--muted);
-  transition: transform 150ms ease;
+  transition: transform 260ms cubic-bezier(0.2, 0, 0.2, 1);
 }
-.routine[open] summary svg {
+.routine-toggle[aria-expanded="true"] svg {
   transform: rotate(90deg);
   color: var(--accent);
 }
+.routine-panel {
+  display: grid;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transition:
+    grid-template-rows 260ms cubic-bezier(0.2, 0, 0.2, 1),
+    opacity 180ms ease,
+    visibility 0s;
+}
+.routine-panel[inert] {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  visibility: hidden;
+  transition-delay: 0s, 0s, 260ms;
+}
 .routine-detail {
-  padding: 0 4px 16px;
+  min-height: 0;
+  overflow: hidden;
+  padding-inline: 4px;
+}
+.routine-detail > .button-row {
+  padding-bottom: 16px;
 }
 .routine-lines {
   list-style: none;
