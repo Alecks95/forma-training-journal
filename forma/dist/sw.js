@@ -1,6 +1,6 @@
 const scope = new URL(self.registration.scope);
 const prefix = 'forma-assets-' + scope.pathname + '-';
-const cacheName = prefix + 'v20';
+const cacheName = prefix + 'v21';
 const assets = [
   './',
   './index.html',
@@ -11,9 +11,10 @@ const assets = [
   './model.js',
   './style.css',
   './manifest.webmanifest',
-  './assets/icon-180.png',
-  './assets/icon-192.png',
-  './assets/icon-512.png',
+  './assets/form-mark.svg',
+  './assets/icon-180.png?v=white',
+  './assets/icon-192.png?v=white',
+  './assets/icon-512.png?v=white',
 ];
 const urls = new Set(assets.map((p) => new URL(p, scope).href));
 const startupDirectory = new URL('./assets/startup/', scope).href;

@@ -123,19 +123,8 @@ svg {
   margin: 0 10px 43px;
 }
 .app-symbol {
-  height: 31px;
-  width: 31px;
+  display: block;
   border-radius: 8px;
-  background: #f1f1f3;
-  display: grid;
-  place-items: center;
-  font:
-    bold italic 24px/1 Helvetica,
-    Arial,
-    sans-serif;
-  letter-spacing: -2px;
-  padding-right: 4px;
-  color: #18181b;
 }
 nav {
   display: flex;
