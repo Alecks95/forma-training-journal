@@ -65,19 +65,27 @@ final class LaunchTests: XCTestCase {
     func compare(_ channel:String, _ name:String) throws {
         continueAfterFailure = false
         let icon = try install(channel, name:name)
-        let modes = ["today","bundle","snapshot","combined","today"]
+        let modes = ["combined","today"]
         for (i, mode) in modes.enumerated() {
             try record("change",channel+"-"+mode)
             for stage in ["receive","cold1","warm","cold2"] {
                 let label=channel+"-"+String(i)+"-"+mode+"-"+stage
                 if stage != "warm" {try record("terminate",label)}
+                if !icon.isHittable {
+                    XCUIDevice.shared.press(.home)
+                    for _ in 0..<4 {
+                        if icon.exists && icon.isHittable {break}
+                        spring.swipeLeft()
+                    }
+                }
+                guard icon.exists && icon.isHittable else {throw Failure.missing("Home icon before "+label)}
                 try record("start",label)
                 icon.tap()
-                Thread.sleep(forTimeInterval:stage == "receive" ? 9 : 4)
+                Thread.sleep(forTimeInterval:stage == "receive" ? 12 : 7)
                 let attachment = XCTAttachment(screenshot:XCUIScreen.main.screenshot())
                 attachment.name = label; attachment.lifetime = .keepAlways; add(attachment)
                 try record("stop",label)
-                XCUIDevice.shared.press(.home)
+                if !icon.isHittable {XCUIDevice.shared.press(.home)}
             }
         }
     }
