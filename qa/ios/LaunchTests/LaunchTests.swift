@@ -49,12 +49,20 @@ final class LaunchTests: XCTestCase {
         add.tap()
         let confirm = safari.buttons["Add"].firstMatch
         guard confirm.waitForExistence(timeout:6) else {snapshot("Confirming",safari);throw Failure.missing("Add")}
-        let installedName = (safari.textFields.firstMatch.value as? String) ?? name
-        print("FORM ORIGINAL ICON NAME " + installedName)
-        confirm.tap()
-        Thread.sleep(forTimeInterval:1)
+        // The sheet mounts while Safari is still reading the page title and icon.
+        // Its Add button can exist on the previous share sheet before it accepts taps.
+        let title = safari.textFields.matching(NSPredicate(format:"value == %@",name)).firstMatch
+        guard title.waitForExistence(timeout:35) else {snapshot("Title",safari);throw Failure.missing("loaded bookmark title")}
+        let enabled = XCTNSPredicateExpectation(predicate:NSPredicate(format:"enabled == YES AND hittable == YES"),object:confirm)
+        guard XCTWaiter.wait(for:[enabled],timeout:12) == .completed else {throw Failure.missing("enabled Add button")}
+        for _ in 0..<3 {
+            if !confirm.exists || !title.exists {break}
+            confirm.tap()
+            Thread.sleep(forTimeInterval:2)
+        }
+        guard !confirm.exists || !title.exists else {snapshot("Pending-install",safari);throw Failure.missing("bookmark installation")}
         if spring.state != .runningForeground { XCUIDevice.shared.press(.home) }
-        let icon = spring.icons.matching(NSPredicate(format:"label IN %@", [installedName, name, "Forma", "Form", "Forma · Training Journal"])).firstMatch
+        let icon = spring.icons[name].firstMatch
         for _ in 0..<4 {
             if icon.exists && icon.isHittable {break}
             spring.swipeLeft()
@@ -85,7 +93,9 @@ final class LaunchTests: XCTestCase {
                 let attachment = XCTAttachment(screenshot:XCUIScreen.main.screenshot())
                 attachment.name = label; attachment.lifetime = .keepAlways; add(attachment)
                 try record("stop",label)
-                if !icon.isHittable {XCUIDevice.shared.press(.home)}
+                if XCUIApplication(bundleIdentifier:"com.apple.webapp").state == .runningForeground || !icon.isHittable {
+                    XCUIDevice.shared.press(.home)
+                }
             }
         }
     }
