@@ -3,16 +3,35 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from subprocess import check_output, run
 from urllib.parse import urlsplit
-import base64, json, mimetypes, os, re, time
+import base64, json, mimetypes, os, re, time, signal, subprocess
 
 # All shipped app files, including the offline worker, come from these releases.
 revisions = {'first': 'dea359f', 'middle': '739a262', 'today': '9a705ae', 'classic': '9a705ae'}
 revisions.update(second='d879ab9', firstopaque='ef84088', renamed='739a262', prelogo='9bcb5b4',
                  animated='ea8e232', direct='c623dc4', recorded='45ccd34')
 revisions.update(bundle='9a705ae', snapshot='9a705ae', combined='9a705ae')
+revisions.update(darkrelease='0ac0e43', whiterelease='cc5f614')
 names = {'first': 'Form First', 'middle': 'Form Middle', 'today': 'Form Today'}
 served = {k: k for k in names}
 sim = os.environ['SIM']
+capture_dir = Path(os.environ['RUNNER_TEMP'])/'form-launch'/'trials'
+capture_dir.mkdir(exist_ok=True)
+captures = {}
+
+def begin_capture(label):
+    output = open(capture_dir/(label+'.log'), 'wb')
+    proc = subprocess.Popen(['xcrun','simctl','io',sim,'recordVideo','--codec=h264',
+                             str(capture_dir/(label+'.mp4'))],stdout=output,stderr=output)
+    captures[label] = proc, output
+    time.sleep(1.5)
+
+def end_capture(label):
+    proc, output = captures.pop(label)
+    if proc.poll() is None:
+        proc.send_signal(signal.SIGINT)
+        try: proc.wait(timeout=12)
+        except subprocess.TimeoutExpired: proc.kill();proc.wait()
+    output.close()
 
 @lru_cache(maxsize=None)
 def asset(rev, name):
@@ -51,8 +70,15 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_error(404)
         if action == 'change':
             served[variant] = param
+        elif action == 'appearance':
+            run(['xcrun','simctl','ui',sim,'appearance',param],check=True)
         elif action == 'terminate':
-            run(['xcrun','simctl','terminate',sim,'com.apple.webapp'],capture_output=True)
+            result=run(['xcrun','simctl','terminate',sim,'com.apple.webapp'],capture_output=True)
+            print('TERMINATE',label,result.returncode,flush=True)
+        elif action == 'start':
+            begin_capture(label)
+        elif action == 'stop':
+            end_capture(label)
         elif action == 'seen':
             print('GEOMETRY',variant,self.rfile.read(int(self.headers.get('Content-Length',0))).decode(),flush=True)
         elif action not in ('start','stop'):
@@ -92,6 +118,8 @@ class Handler(BaseHTTPRequestHandler):
             if revision=='classic':
                 html=historical_shell(html)
             probe="""<script>addEventListener('load',()=>setTimeout(()=>{let t=document.createElement('i');t.style.cssText='position:fixed;visibility:hidden;height:env(safe-area-inset-top)';document.body.append(t);fetch('/seen/VARIANT',{method:'POST',body:JSON.stringify({rev:'REV',standalone:navigator.standalone,inset:getComputedStyle(t).height,h:innerHeight,clock:Date.now(),worker:!!navigator.serviceWorker.controller})});t.remove()},500))</script>"""
+            if revision in ('darkrelease','whiterelease'):
+                probe="""<script>function report(){if(!document.hidden){const t=document.createElement('i');t.style.cssText='position:fixed;visibility:hidden;height:env(safe-area-inset-top)';document.body.append(t);fetch('/seen/VARIANT',{method:'POST',body:JSON.stringify({rev:'REV',standalone:navigator.standalone,inset:getComputedStyle(t).height,body:getComputedStyle(document.body).backgroundColor,darkOS:matchMedia('(prefers-color-scheme: dark)').matches,worker:!!navigator.serviceWorker.controller})});t.remove()}} addEventListener('pageshow',()=>setTimeout(report,500));document.addEventListener('visibilitychange',()=>setTimeout(report,500));</script>"""
             body=html.replace('</body>',probe.replace('VARIANT',variant).replace('REV',revision)+'</body>').encode()
         elif name=='sw.js' and revision in ('classic','bundle','snapshot','combined'):
             body=body.replace(b"'v17'",repr('lab-'+revision).encode())

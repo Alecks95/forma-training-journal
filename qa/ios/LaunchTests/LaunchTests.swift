@@ -73,12 +73,14 @@ final class LaunchTests: XCTestCase {
     func compare(_ channel:String, _ name:String) throws {
         continueAfterFailure = false
         let icon = try install(channel, name:name)
-        let modes = ["combined","today"]
-        for (i, mode) in modes.enumerated() {
+        let modes = [("darkrelease","dark"),("whiterelease","dark"),("whiterelease","light")]
+        for (mode, appearance) in modes {
+            try record("appearance",channel+"-"+appearance)
             try record("change",channel+"-"+mode)
-            for stage in ["receive","cold1","warm","cold2"] {
-                let label=channel+"-"+String(i)+"-"+mode+"-"+stage
-                if stage != "warm" {try record("terminate",label)}
+            let stages = mode == "darkrelease" ? ["receive","cold1","warm1","cold2"] : ["receive","cold1","warm1","cold2","warm2","cold3"]
+            for stage in stages {
+                let label=channel+"-"+mode+"-"+appearance+"-"+stage
+                if !stage.hasPrefix("warm") {try record("terminate",label)}
                 if !icon.isHittable {
                     XCUIDevice.shared.press(.home)
                     for _ in 0..<4 {
