@@ -3,12 +3,13 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from subprocess import check_output, run
 from urllib.parse import urlsplit
-import json, mimetypes, os, re, time
+import base64, json, mimetypes, os, re, time
 
 # All shipped app files, including the offline worker, come from these releases.
 revisions = {'first': 'dea359f', 'middle': '739a262', 'today': '9a705ae', 'classic': '9a705ae'}
 revisions.update(second='d879ab9', firstopaque='ef84088', renamed='739a262', prelogo='9bcb5b4',
                  animated='ea8e232', direct='c623dc4', recorded='45ccd34')
+revisions.update(bundle='9a705ae', snapshot='9a705ae', combined='9a705ae')
 names = {'first': 'Form First', 'middle': 'Form Middle', 'today': 'Form Today'}
 served = {k: k for k in names}
 sim = os.environ['SIM']
@@ -72,12 +73,28 @@ class Handler(BaseHTTPRequestHandler):
         except Exception: return self.send_error(404)
         if name=='index.html':
             html=body.decode()
+            if revision in ('bundle','combined'):
+                # Give WebKit a complete offline document in a single response.
+                imports = {}
+                for module in ('model','ui','views','forms','app'):
+                    js = asset(revision,module+'.js').decode()
+                    js = re.sub(r"from './(\w+)\.js'",r"from 'form/\1'",js)
+                    imports['form/'+module]='data:text/javascript;base64,'+base64.b64encode(js.encode()).decode()
+                start=html.index('    <link\n      id="app-styles"')
+                html=html[:start]+'<style>'+asset(revision,'style.css').decode()+'</style><script type="importmap">'+json.dumps({'imports':imports})+'</script>'+html[html.index('  </head>',start):]
+                html=html.replace('<script type="module" src="./app.js"></script>','<script type="module">import "form/app"</script>')
+                html=html.replace('<main id="main" tabindex="-1">','<main id="main" tabindex="-1"><h1>Workout</h1>')
+            if revision in ('snapshot','combined'):
+                # Supply an opaque snapshot for the transition back from SpringBoard.
+                snapshot='''<style>html.form-background body>*{visibility:hidden!important}html.form-background,html.form-background body{background:#000!important}</style>
+<script>function cover(){document.documentElement.classList.add('form-background')}function uncover(){requestAnimationFrame(()=>document.documentElement.classList.remove('form-background'))}document.addEventListener('visibilitychange',()=>document.hidden?cover():uncover());addEventListener('pagehide',cover);addEventListener('pageshow',uncover)</script>'''
+                html=html.replace('</head>',snapshot+'</head>')
             if revision=='classic':
                 html=historical_shell(html)
             probe="""<script>addEventListener('load',()=>setTimeout(()=>{let t=document.createElement('i');t.style.cssText='position:fixed;visibility:hidden;height:env(safe-area-inset-top)';document.body.append(t);fetch('/seen/VARIANT',{method:'POST',body:JSON.stringify({rev:'REV',standalone:navigator.standalone,inset:getComputedStyle(t).height,h:innerHeight,clock:Date.now(),worker:!!navigator.serviceWorker.controller})});t.remove()},500))</script>"""
             body=html.replace('</body>',probe.replace('VARIANT',variant).replace('REV',revision)+'</body>').encode()
-        elif name=='sw.js' and revision=='classic':
-            body=body.replace(b"'v17'",b"'historical-shell-test'")
+        elif name=='sw.js' and revision in ('classic','bundle','snapshot','combined'):
+            body=body.replace(b"'v17'",repr('lab-'+revision).encode())
         self.send_response(200)
         self.send_header('Cache-Control','no-store')
         self.send_header('Content-Type',{'manifest.webmanifest':'application/manifest+json'}.get(name,mimetypes.guess_type(name)[0] or 'application/octet-stream'))

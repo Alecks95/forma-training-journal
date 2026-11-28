@@ -65,10 +65,10 @@ final class LaunchTests: XCTestCase {
     func compare(_ channel:String, _ name:String) throws {
         continueAfterFailure = false
         let icon = try install(channel, name:name)
-        let modes = ["first","second","firstopaque","renamed","prelogo","animated","direct","recorded","today","classic","first"]
+        let modes = ["today","bundle","snapshot","combined","today"]
         for (i, mode) in modes.enumerated() {
-            if i != 0 {try record("change",channel+"-"+mode)}
-            for stage in ["receive","cold1","warm"] {
+            try record("change",channel+"-"+mode)
+            for stage in ["receive","cold1","warm","cold2"] {
                 let label=channel+"-"+String(i)+"-"+mode+"-"+stage
                 if stage != "warm" {try record("terminate",label)}
                 try record("start",label)
@@ -82,7 +82,7 @@ final class LaunchTests: XCTestCase {
         }
     }
 
-    func testFirstRelease() throws {try compare("first", "Form First")}
+    func testRetainedBookmark() throws {try compare("middle", "Form")}
     enum Failure: Error {case missing(String)}
 }
 
