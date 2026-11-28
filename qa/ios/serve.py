@@ -11,6 +11,7 @@ revisions.update(second='d879ab9', firstopaque='ef84088', renamed='739a262', pre
                  animated='ea8e232', direct='c623dc4', recorded='45ccd34')
 revisions.update(bundle='9a705ae', snapshot='9a705ae', combined='9a705ae')
 revisions.update(darkrelease='0ac0e43', whiterelease='cc5f614')
+revisions.update(whiteicon='38e1d36')
 names = {'first': 'Form First', 'middle': 'Form Middle', 'today': 'Form Today'}
 served = {k: k for k in names}
 sim = os.environ['SIM']
@@ -118,9 +119,13 @@ class Handler(BaseHTTPRequestHandler):
             if revision=='classic':
                 html=historical_shell(html)
             probe="""<script>addEventListener('load',()=>setTimeout(()=>{let t=document.createElement('i');t.style.cssText='position:fixed;visibility:hidden;height:env(safe-area-inset-top)';document.body.append(t);fetch('/seen/VARIANT',{method:'POST',body:JSON.stringify({rev:'REV',standalone:navigator.standalone,inset:getComputedStyle(t).height,h:innerHeight,clock:Date.now(),worker:!!navigator.serviceWorker.controller})});t.remove()},500))</script>"""
-            if revision in ('darkrelease','whiterelease'):
+            if revision in ('darkrelease','whiterelease','whiteicon'):
                 probe="""<script>function report(){if(!document.hidden){const t=document.createElement('i');t.style.cssText='position:fixed;visibility:hidden;height:env(safe-area-inset-top)';document.body.append(t);fetch('/seen/VARIANT',{method:'POST',body:JSON.stringify({rev:'REV',standalone:navigator.standalone,inset:getComputedStyle(t).height,body:getComputedStyle(document.body).backgroundColor,darkOS:matchMedia('(prefers-color-scheme: dark)').matches,worker:!!navigator.serviceWorker.controller})});t.remove()}} addEventListener('pageshow',()=>setTimeout(report,500));document.addEventListener('visibilitychange',()=>setTimeout(report,500));</script>"""
+            if revision=='whiteicon' and variant=='today':
+                html=html.replace('name="apple-mobile-web-app-title" content="Form"', 'name="apple-mobile-web-app-title" content="Form White"').replace('<title>Form ·', '<title>Form White ·')
             body=html.replace('</body>',probe.replace('VARIANT',variant).replace('REV',revision)+'</body>').encode()
+        elif name=='manifest.webmanifest' and revision=='whiteicon' and variant=='today':
+            body=body.replace(b'"Form"',b'"Form White"')
         elif name=='sw.js' and revision in ('classic','bundle','snapshot','combined'):
             body=body.replace(b"'v17'",repr('lab-'+revision).encode())
         self.send_response(200)

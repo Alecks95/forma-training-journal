@@ -70,39 +70,46 @@ final class LaunchTests: XCTestCase {
         guard icon.exists && icon.isHittable else {snapshot("Home-"+name,spring);throw Failure.missing(name)}
         return icon
     }
-    func compare(_ channel:String, _ name:String) throws {
-        continueAfterFailure = false
-        let icon = try install(channel, name:name)
-        let modes = [("darkrelease","dark"),("whiterelease","dark"),("whiterelease","light")]
-        for (mode, appearance) in modes {
-            try record("appearance",channel+"-"+appearance)
-            try record("change",channel+"-"+mode)
-            let stages = mode == "darkrelease" ? ["receive","cold1","warm1","cold2"] : ["receive","cold1","warm1","cold2","warm2","cold3"]
-            for stage in stages {
-                let label=channel+"-"+mode+"-"+appearance+"-"+stage
-                if !stage.hasPrefix("warm") {try record("terminate",label)}
-                if !icon.isHittable {
-                    XCUIDevice.shared.press(.home)
-                    for _ in 0..<4 {
-                        if icon.exists && icon.isHittable {break}
-                        spring.swipeLeft()
-                    }
-                }
-                guard icon.exists && icon.isHittable else {throw Failure.missing("Home icon before "+label)}
-                try record("start",label)
-                icon.tap()
-                Thread.sleep(forTimeInterval:stage == "receive" ? 12 : 7)
-                let attachment = XCTAttachment(screenshot:XCUIScreen.main.screenshot())
-                attachment.name = label; attachment.lifetime = .keepAlways; add(attachment)
-                try record("stop",label)
-                if XCUIApplication(bundleIdentifier:"com.apple.webapp").state == .runningForeground || !icon.isHittable {
-                    XCUIDevice.shared.press(.home)
-                }
-            }
+    func showOnHome(_ icon: XCUIElement) throws {
+        if XCUIApplication(bundleIdentifier:"com.apple.webapp").state == .runningForeground || !icon.isHittable {
+            XCUIDevice.shared.press(.home)
         }
+        for _ in 0..<4 {
+            if icon.exists && icon.isHittable {return}
+            spring.swipeLeft()
+        }
+        throw Failure.missing("installed Home icon")
     }
-
-    func testRetainedBookmark() throws {try compare("middle", "Form")}
+    func photograph(_ icon: XCUIElement, _ label: String) throws {
+        try showOnHome(icon)
+        Thread.sleep(forTimeInterval:1)
+        let shot = XCTAttachment(screenshot:icon.screenshot())
+        shot.name=label;shot.lifetime = .keepAlways;add(shot)
+    }
+    func launch(_ icon: XCUIElement, _ label: String) throws {
+        try record("terminate",label)
+        try showOnHome(icon)
+        try record("start",label)
+        icon.tap()
+        Thread.sleep(forTimeInterval:9)
+        try record("stop",label)
+        try showOnHome(icon)
+    }
+    func testRetainedBookmark() throws {
+        continueAfterFailure=false
+        let existing=try install("middle",name:"Form")
+        try record("change","middle-whiterelease")
+        try launch(existing,"middle-previous")
+        try photograph(existing,"retained-before")
+        try record("change","middle-whiteicon")
+        try launch(existing,"middle-receive")
+        try launch(existing,"middle-updated")
+        try photograph(existing,"retained-after")
+        try record("change","today-whiteicon")
+        let fresh=try install("today",name:"Form White")
+        try photograph(fresh,"fresh-white")
+        try launch(fresh,"today-fresh")
+    }
     enum Failure: Error {case missing(String)}
 }
 
