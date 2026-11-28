@@ -63,7 +63,7 @@ function listRow(glyph, title, sub, actions = '') {
     '</div></div>'
   );
 }
-const totalSets = (r) => r.items.reduce((a, i) => a + i.sets, 0);
+const setCount = (count) => count + (count === 1 ? ' set' : ' sets');
 const sortedSessions = (s) => [...s.sessions].sort((a, b) => b.ended - a.ended);
 function daySessions(list) {
   return rows(
@@ -89,75 +89,52 @@ function daySessions(list) {
       .join(''),
   );
 }
-function workoutScreen(s, c) {
-  const r =
-    s.routines.find(
-      (x) =>
-        x.id ===
-        (c.routine || s.active?.routineId || sortedSessions(s)[0]?.routineId),
-    ) || s.routines[0];
-  const list = s.routines
-    .map((x) =>
-      btn(
-        'select-routine',
-        '<span><strong>' +
-          esc(x.name) +
-          '</strong><small>' +
-          x.items.length +
-          ' exercises · ' +
-          totalSets(x) +
-          ' sets</small></span>' +
-          icon('chevron', 16),
-        'routine-option ' + (x.id === r?.id ? 'selected' : ''),
-        idAttr(x.id) + ' aria-pressed="' + (x.id === r?.id) + '"',
-      ),
-    )
-    .join('');
-  const items = r?.items
-    .map((i) => {
-      const e = s.exercises.find((x) => x.id === i.exerciseId);
+function routineRow(r, s, expanded) {
+  const items = r.items
+    .map((item) => {
+      const exercise = s.exercises.find((e) => e.id === item.exerciseId);
       return (
-        '<li><div><strong>' +
-        esc(e.name) +
+        '<li><strong>' +
+        esc(exercise.name) +
         '</strong><small>' +
-        i.sets +
-        ' × ' +
-        i.reps +
-        ' reps · ' +
-        i.rir +
-        ' RIR</small></div><span class="routine-load"><small>' +
-        clockText(i.rest) +
-        ' rest</small></span></li>'
+        setCount(item.sets) +
+        ' · ' +
+        clockText(item.rest) +
+        ' rest</small></li>'
       );
     })
     .join('');
-  const preview = r
-    ? '<section class="routine-preview"><div class="card-top"><h2>' +
-      esc(r.name) +
-      '</h2>' +
-      smallBtn('routine-edit', 'Edit ' + r.name, 'edit', idAttr(r.id)) +
-      '</div><p class="subhead">' +
-      r.items.length +
-      ' exercises · ' +
-      totalSets(r) +
-      ' working sets</p><ul class="routine-lines">' +
-      items +
-      '</ul>' +
-      (!s.active && !r.items.length
-        ? btn(
-            'routine-edit',
-            icon('plus', 16) + 'Add exercises',
-            'start-routine full',
-            idAttr(r.id),
-          )
-        : btn(
-            s.active ? 'resume' : 'start',
-            icon('play', 15) + (s.active ? 'Resume workout' : 'Start routine'),
-            'start-routine full',
-            idAttr(r.id),
-          )) +
-      '</section>'
-    : '';
+  const edit = btn('routine-edit', 'Edit routine', 'button', idAttr(r.id));
+  let start = '';
+  if (!s.active && items)
+    start = btn(
+      'start',
+      icon('play', 15) + 'Start routine',
+      'start-routine',
+      idAttr(r.id),
+    );
+  else if (s.active?.routineId === r.id)
+    start = btn('resume', 'Resume workout', 'start-routine');
+  return (
+    '<details class="routine" name="workout-routines" data-routine="' +
+    esc(r.id) +
+    '"' +
+    (expanded ? ' open' : '') +
+    '><summary><strong>' +
+    esc(r.name) +
+    '</strong>' +
+    icon('chevron', 16) +
+    '</summary><div class="routine-detail">' +
+    (items
+      ? '<ul class="routine-lines">' + items + '</ul>'
+      : '<p class="subhead">No exercises in this routine.</p>') +
+    '<div class="button-row">' +
+    start +
+    edit +
+    '</div></div></details>'
+  );
+}
+function workoutScreen(s, c) {
   return (
     head(
       'Workout',
@@ -180,17 +157,15 @@ function workoutScreen(s, c) {
       'My routines',
       btn('routine-new', icon('plus', 16) + 'New routine', 'text-btn'),
     ) +
-    (r
-      ? '<div class="routine-browser"><div class="routine-picker" aria-label="Choose a routine">' +
-        list +
-        '</div>' +
-        preview +
+    (s.routines.length
+      ? '<div class="routines">' +
+        s.routines.map((r) => routineRow(r, s, c.routine === r.id)).join('') +
         '</div>'
       : rows(
           infoRow(
             'book',
             'No routines',
-            'Use New routine to save exercises and set targets.',
+            'Use New routine to save exercises, sets and rest times.',
           ),
         ))
   );
@@ -580,12 +555,7 @@ function exercises(s, c) {
               listRow(
                 'workouts',
                 e.name,
-                e.sets +
-                  ' × ' +
-                  e.reps +
-                  ' reps · ' +
-                  clockText(e.rest) +
-                  ' rest',
+                setCount(e.sets) + ' · ' + clockText(e.rest) + ' rest',
                 smallBtn(
                   'exercise-view',
                   'View ' + e.name + ' progress',
@@ -637,8 +607,8 @@ function activeExercise(s, item) {
           : '—';
       const inputs = [
         ['kg', t.kg == null ? '' : displayWeight(t.kg, s.unit)],
-        ['reps', t.reps],
-        ['rir', t.rir],
+        ['reps', t.reps ?? ''],
+        ['rir', t.rir ?? ''],
       ]
         .map(
           ([key, v]) =>
@@ -658,10 +628,8 @@ function activeExercise(s, item) {
             (key === 'reps' ? 999 : key === 'rir' ? 20 : 100000) +
             '" step="' +
             (key === 'kg' ? 'any' : 1) +
-            '" ' +
-            (key === 'kg'
-              ? 'placeholder="—" title="Enter 0 for bodyweight" '
-              : '') +
+            '" placeholder="—" ' +
+            (key === 'kg' ? 'title="Enter 0 for bodyweight" ' : '') +
             'required data-set="' +
             key +
             '" ' +

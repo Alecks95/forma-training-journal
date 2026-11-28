@@ -4,6 +4,7 @@ import {
   localDay,
   shiftDay,
   startSession,
+  emptySet,
   doneSets,
   kgWeight,
 } from './model.js';
@@ -17,6 +18,17 @@ let state,
 const ctx = { foodDay: localDay(), exercise: '', routine: '', graphSet: null };
 const main = document.querySelector('main'),
   nav = document.querySelector('nav');
+main.addEventListener(
+  'toggle',
+  ({ target }) => {
+    if (target.matches('details[data-routine]')) {
+      ctx.routine =
+        main.querySelector('details[data-routine][open]')?.dataset.routine ||
+        '';
+    }
+  },
+  true,
+);
 const bus =
   'BroadcastChannel' in window
     ? new BroadcastChannel('forma-journal-changes')
@@ -370,10 +382,6 @@ async function actions(action, b) {
       ctx.foodDay = shiftDay(ctx.foodDay, action === 'day-prev' ? -1 : 1);
       draw();
       return;
-    case 'select-routine':
-      ctx.routine = id;
-      draw();
-      return;
     case 'empty-start':
       await save((s) => {
         if (!s.active)
@@ -394,8 +402,7 @@ async function actions(action, b) {
         const sets = activeItem(s, workout, entry).sets;
         if (action === 'set-add') {
           if (sets.length >= 100) throw Error('Maximum 100 sets per exercise.');
-          const { reps, rir } = sets.at(-1);
-          sets.push({ kg: null, reps, rir, done: false });
+          sets.push(emptySet());
         } else if (
           sets.length > 1 &&
           sets.at(-1).entryId === setId &&
@@ -488,7 +495,7 @@ async function storeSetInput(event) {
   const el = event.target;
   if (!el.dataset.set || !state?.active) return;
   const { set: key, workout, entry, setId } = el.dataset;
-  const empty = key === 'kg' && el.value === '' && !el.validity.badInput;
+  const empty = el.value === '' && !el.validity.badInput;
   const uncheck = empty && el.closest('.set-line').classList.contains('done');
   if (event.type === 'change' && !uncheck) {
     if (!empty) el.reportValidity();

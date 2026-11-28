@@ -89,17 +89,16 @@ function removeStarterLibrary(journal) {
   return true;
 }
 
+export function emptySet() {
+  return { kg: null, reps: null, rir: null, done: false };
+}
+
 export function sessionExerciseItem(exercise, targets = exercise) {
   return {
     exerciseId: exercise.id,
     name: exercise.name,
     rest: targets.rest,
-    sets: Array.from({ length: targets.sets }, () => ({
-      reps: targets.reps,
-      kg: null,
-      rir: targets.rir,
-      done: false,
-    })),
+    sets: Array.from({ length: targets.sets }, emptySet),
   };
 }
 
@@ -191,9 +190,7 @@ const dayOk = (x) =>
   typeof x === 'string' &&
   /^\d{4}-\d{2}-\d{2}$/.test(x) &&
   localDay(dateAt(x)) === x;
-const targetOk = (x) => integer(x.reps, 1, 999) && integer(x.rir, 0, 20);
-const planOk = (x) =>
-  targetOk(x) && integer(x.sets, 1, 100) && integer(x.rest, 0, 3600);
+const planOk = (x) => integer(x.sets, 1, 100) && integer(x.rest, 0, 3600);
 const nutritionOk = (x) => macros.every((k) => numeric(x[k], 0, 1000000));
 const unique = (a, key) => new Set(a.map((x) => x[key])).size === a.length;
 export function validState(s) {
@@ -247,7 +244,8 @@ export function validState(s) {
           ) &&
           i.sets.every(
             (set) =>
-              targetOk(set) &&
+              (integer(set.reps, 1, 999) || (set.reps === null && !set.done)) &&
+              (integer(set.rir, 0, 20) || (set.rir === null && !set.done)) &&
               (numeric(set.kg, 0, 100000) || (set.kg === null && !set.done)) &&
               typeof set.done === 'boolean' &&
               (set.entryId === undefined || idOk(set.entryId)),

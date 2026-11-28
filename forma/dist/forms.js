@@ -111,25 +111,14 @@ const assertName = (records, name, id) => {
     throw Error('That name is already in your library.');
 };
 function targets(x, prefix = '') {
-  return (
-    grid(
-      field('Sets', prefix + 'sets', x.sets, { min: 1, max: 100, step: 1 }) +
-        field('Reps', prefix + 'reps', x.reps, { min: 1, max: 999, step: 1 }),
-    ) +
-    grid(
-      field('Reps in reserve', prefix + 'rir', x.rir, { max: 20, step: 1 }) +
-        field('Rest (seconds)', prefix + 'rest', x.rest, {
-          max: 3600,
-          step: 1,
-        }),
-    )
+  return grid(
+    field('Sets', prefix + 'sets', x.sets, { min: 1, max: 100, step: 1 }) +
+      field('Rest (seconds)', prefix + 'rest', x.rest, { max: 3600, step: 1 }),
   );
 }
 function readTargets(fd, p = '') {
   return {
     sets: num(fd, p + 'sets'),
-    reps: num(fd, p + 'reps'),
-    rir: num(fd, p + 'rir'),
     rest: num(fd, p + 'rest'),
   };
 }
@@ -197,7 +186,7 @@ export function buildForms(env) {
   }
   function exercise(id, onSaved, sessionId) {
     const existing = state().exercises.find((e) => e.id === id),
-      x = existing || { name: '', sets: 3, reps: 8, rir: 2, rest: 90 };
+      x = existing || { name: '', sets: 3, rest: 90 };
     const editor = form(
       existing ? 'Edit exercise' : 'New exercise',
       field('Exercise name', 'name', x.name, { type: 'text' }) + targets(x),
@@ -254,8 +243,6 @@ export function buildForms(env) {
             );
           saveLibraryItem(s.routines, record, old);
         });
-        ctx.routine = record.id;
-        draw();
         toast('Routine saved');
       },
     );
@@ -562,9 +549,9 @@ export function buildForms(env) {
                 ' ' +
                 state().unit +
                 ' × ' +
-                set.reps +
+                (set.reps ?? '—') +
                 ' · ' +
-                set.rir +
+                (set.rir ?? '—') +
                 ' RIR</small></div>' +
                 smallBtn(
                   'inline',
